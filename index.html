@@ -1693,7 +1693,7 @@ let map;
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView([34.02, -118.35], 11);
 
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=STADIA_API_KEY_PLACEHOLDER', {
     maxZoom: 18,
     attribution: '© Stadia Maps © OpenMapTiles © OpenStreetMap'
   }).addTo(map);
