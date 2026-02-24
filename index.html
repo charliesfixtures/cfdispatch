@@ -1408,7 +1408,7 @@ const CUSTOM_FIELDS = {
 };
 
 const FRUITLAND = { lat: 33.9989, lng: -118.2054, name: 'Fruitland Warehouse' };
-const HQ = { lat: 34.0063, lng: -118.4702, name: "Charlie's HQ" };
+const HQ = { lat: 34.0052, lng: -118.3858, name: "Charlie's HQ" };
 
 const DAY_COLORS = {
   MON: '#f0c93a', TUE: '#4f8eff', WED: '#7ed6a0',
@@ -1701,19 +1701,19 @@ function initMap() {
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   // Permanent landmarks
-  addLandmarkPin(FRUITLAND, '🏭', '#f0c93a');
-  addLandmarkPin(HQ, '🏠', '#4f8eff');
+  addLandmarkPin(FRUITLAND, '#f0c93a');
+  addLandmarkPin(HQ, '#4f8eff');
 }
 
-function addLandmarkPin(loc, emoji, color) {
+function addLandmarkPin(loc, color) {
   const icon = L.divIcon({
     className: '',
-    html: `<div class="landmark-pin"><div class="landmark-icon" style="background:${color}20;border-color:${color}40;">${emoji}</div></div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+    html: `<div class="landmark-pin"><div class="landmark-icon" style="background:${color};border-color:${color};padding:3px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.4);"><img src="assets/cf-pin.png" width="28" height="28" style="display:block;border-radius:4px;" /></div></div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
   L.marker([loc.lat, loc.lng], { icon, zIndexOffset: -100 })
-    .bindTooltip(loc.name, { permanent: false, direction: 'top', className: '' })
+    .bindTooltip(loc.name, { permanent: false, direction: 'top' })
     .addTo(map);
 }
 
