@@ -1408,7 +1408,7 @@ const CUSTOM_FIELDS = {
 };
 
 const FRUITLAND = { lat: 33.9989, lng: -118.2054, name: 'Fruitland Warehouse' };
-const HQ = { lat: 34.0052, lng: -118.3858, name: "Charlie's HQ" };
+const HQ = { lat: 34.043654, lng: -118.307807, name: "Charlie's HQ" };
 
 const DAY_COLORS = {
   MON: '#f0c93a', TUE: '#4f8eff', WED: '#7ed6a0',
@@ -2402,22 +2402,40 @@ async function processCard(card) {
 
   // Get location from card (uses Trello location power-up data in pluginData)
   let address = null;
-  try {
-    const fullCard = await trello(`/cards/${card.id}?pluginData=true&fields=id,name,shortLink,desc`);
-    const locationPlugin = fullCard.pluginData?.find(p => p.value?.includes('location'));
-    if (locationPlugin) {
-      const val = JSON.parse(locationPlugin.value);
-      address = val.address || val.location || null;
-    }
-  } catch {}
-
-  // Geocode
   let coords = null;
   let quadrant = null;
-  if (address) {
-    coords = await geocode(address);
-    if (coords) quadrant = getQuadrant(coords);
-  }
+  try {
+    const fullCard = await trello(`/cards/${card.id}?pluginData=true&fields=id,name,shortLink,desc`);
+    console.log('pluginData for', card.name, ':', JSON.stringify(fullCard.pluginData));
+
+    const locationPlugin = fullCard.pluginData?.find(p => {
+      try { const v = JSON.parse(p.value); return v.latitude || v.lat || v.coordinates || v.address || v.location; }
+      catch { return false; }
+    });
+
+    if (locationPlugin) {
+      const val = JSON.parse(locationPlugin.value);
+      console.log('Location data found:', JSON.stringify(val));
+
+      // Pull Google-accurate coords directly from Trello pluginData
+      const lat = val.latitude ?? val.lat ?? val.coordinates?.latitude ?? null;
+      const lng = val.longitude ?? val.lng ?? val.coordinates?.longitude ?? null;
+
+      address = val.address || val.name || val.location || null;
+
+      if (lat && lng) {
+        // Use coordinates directly — these came from Google Places, no need to re-geocode
+        coords = { lat: parseFloat(lat), lng: parseFloat(lng) };
+        quadrant = getQuadrant(coords);
+        console.log('Using Trello coords directly:', coords);
+      } else if (address) {
+        // Fallback to Nominatim only if no coords in pluginData
+        coords = await geocode(address);
+        if (coords) quadrant = getQuadrant(coords);
+        console.log('Fell back to Nominatim geocode:', coords);
+      }
+    }
+  } catch(e) { console.log('Location parse error:', e); }
 
   // Parse delivery instructions from card comments (submitted via request form)
   const commentData = parseDeliveryComment(card.desc || '');
