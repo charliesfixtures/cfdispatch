@@ -15,15 +15,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Inject secrets into index.html
+      - name: Inject secrets
         run: |
-          sed -i "s|TRELLO_API_KEY_PLACEHOLDER|${{ secrets.TRELLO_API_KEY }}|g" index.html
-          sed -i "s|TRELLO_TOKEN_PLACEHOLDER|${{ secrets.TRELLO_TOKEN }}|g" index.html
-
-      - name: Inject secrets into request.html
-        run: |
-          sed -i "s|TRELLO_API_KEY_PLACEHOLDER|${{ secrets.TRELLO_API_KEY }}|g" request.html
-          sed -i "s|TRELLO_TOKEN_PLACEHOLDER|${{ secrets.TRELLO_TOKEN }}|g" request.html
+          sed -i "s|TRELLO_API_KEY_PLACEHOLDER|${{ secrets.TRELLO_API_KEY }}|g" index.html request.html
+          sed -i "s|TRELLO_TOKEN_PLACEHOLDER|${{ secrets.TRELLO_TOKEN }}|g" index.html request.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
