@@ -19,6 +19,7 @@ jobs:
         run: |
           sed -i "s|TRELLO_API_KEY_PLACEHOLDER|${{ secrets.TRELLO_API_KEY }}|g" index.html request.html
           sed -i "s|TRELLO_TOKEN_PLACEHOLDER|${{ secrets.TRELLO_TOKEN }}|g" index.html request.html
+          sed -i "s|STADIA_API_KEY_PLACEHOLDER|${{ secrets.STADIA_API_KEY }}|g" index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
