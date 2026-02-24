@@ -453,7 +453,7 @@ body {
 }
 
 .day-pill {
-  padding: 5px 12px;
+  padding: 5px 10px;
   border-radius: 20px;
   font-size: 11px;
   font-family: 'DM Mono', monospace;
@@ -463,17 +463,17 @@ body {
   border: 1px solid transparent;
   color: var(--text2);
   user-select: none;
-  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.2;
 }
 
+.pill-day { display: block; letter-spacing: 0.04em; font-weight: 600; }
+.pill-date { display: block; font-size: 9px; color: var(--text3); margin-top: 1px; font-weight: 400; }
+
 .day-pill:hover { color: var(--text); background: var(--surface2); }
-.day-pill.active { color: #000; font-weight: 600; }
-.day-pill[data-day="MON"].active { background: var(--mon); border-color: var(--mon); }
-.day-pill[data-day="TUE"].active { background: var(--tue); border-color: var(--tue); }
-.day-pill[data-day="WED"].active { background: var(--wed); border-color: var(--wed); }
-.day-pill[data-day="THU"].active { background: var(--thu); border-color: var(--thu); color: #fff; }
-.day-pill[data-day="FRI"].active { background: var(--fri); border-color: var(--fri); }
-.day-pill[data-day="ALL"].active { background: var(--text2); border-color: var(--text2); color: #000; }
+.day-pill:hover .pill-date { color: var(--text2); }
+.day-pill.active { color: #000 !important; font-weight: 600; background: var(--accent); border-color: var(--accent); }
+.day-pill.active .pill-date { color: rgba(0,0,0,0.6); }
 
 .week-toggle {
   position: absolute;
@@ -701,19 +701,28 @@ body {
 .stop-item:hover { background: var(--surface3); }
 
 .stop-num {
-  width: 20px; height: 20px;
-  border-radius: 50%;
+  width: 24px; height: 20px;
+  border-radius: 6px;
   background: var(--surface3);
   border: 1px solid var(--border2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 9px;
   font-family: 'DM Mono', monospace;
   font-weight: 600;
   flex-shrink: 0;
   color: var(--text2);
 }
+
+.drag-handle {
+  cursor: grab;
+  letter-spacing: -1px;
+}
+
+.drag-handle:active { cursor: grabbing; }
+
+.stop-item[draggable="true"]:hover { cursor: grab; }
 
 .stop-content { flex: 1; min-width: 0; }
 .stop-name { font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -935,6 +944,26 @@ body {
 .fs-btn.selected { background: var(--info); border-color: var(--info); color: #fff; }
 .fs-btn.revoke.selected { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+.truck-c-wrap {
+  padding: 0 8px 6px;
+  flex-shrink: 0;
+}
+
+.truck-c-btn {
+  width: 100%;
+  padding: 7px;
+  border-radius: 8px;
+  border: 1px dashed var(--border2);
+  background: transparent;
+  color: var(--text3);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.truck-c-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ── TOAST ───────────────────────────────────────────── */
 .toast-container {
   position: fixed;
@@ -1012,11 +1041,28 @@ body {
   background: var(--text3);
   border: 2px solid var(--surface2);
   animation: pulseDot 2s infinite;
+  transition: all 0.2s;
+}
+
+.unscheduled-pin.selected {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-color: #fff;
+  border-width: 2px;
+  margin: -3px;
+  animation: pulseSelected 1s infinite;
+  box-shadow: 0 0 0 4px rgba(240,201,58,0.3);
 }
 
 @keyframes pulseDot {
   0%, 100% { box-shadow: 0 0 0 0 rgba(125,139,168,0.4); }
   50% { box-shadow: 0 0 0 5px rgba(125,139,168,0); }
+}
+
+@keyframes pulseSelected {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(240,201,58,0.5), 0 0 0 6px rgba(240,201,58,0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(240,201,58,0.3), 0 0 0 12px rgba(240,201,58,0.1); }
 }
 
 .landmark-pin {
@@ -1190,7 +1236,7 @@ body {
 
 <!-- HEADER -->
 <div class="header">
-  <div class="logo">CF <span>DISPATCH</span></div>
+  <div class="logo"><img src="assets/cf-logo.png" height="28" style="vertical-align:middle;margin-right:6px;" alt="Charlie's Fixtures" /><span>DISPATCH</span></div>
   <div class="header-sep"></div>
   <div class="sync-info">
     <div class="sync-dot" id="sync-dot"></div>
@@ -1239,19 +1285,8 @@ body {
     <div id="map"></div>
 
     <!-- Day layer pills -->
-    <div class="map-controls">
-      <div class="day-pill active" data-day="ALL" onclick="setDayFilter('ALL')">ALL</div>
-      <div class="day-pill" data-day="MON" onclick="setDayFilter('MON')">MON</div>
-      <div class="day-pill" data-day="TUE" onclick="setDayFilter('TUE')">TUE</div>
-      <div class="day-pill" data-day="WED" onclick="setDayFilter('WED')">WED</div>
-      <div class="day-pill" data-day="THU" onclick="setDayFilter('THU')">THU</div>
-      <div class="day-pill" data-day="FRI" onclick="setDayFilter('FRI')">FRI</div>
-    </div>
-
-    <!-- Week toggle -->
-    <div class="week-toggle">
-      <div class="week-btn active" data-week="1" onclick="setWeek(1)">WK1</div>
-      <div class="week-btn" data-week="2" onclick="setWeek(2)">WK2</div>
+    <div class="map-controls" id="map-controls">
+      <!-- populated dynamically -->
     </div>
 
     <!-- Suggestion banner -->
@@ -1276,6 +1311,9 @@ body {
     </div>
     <div class="route-panel" id="route-panel">
       <!-- populated by JS -->
+    </div>
+    <div class="truck-c-wrap" id="truck-c-wrap">
+      <button class="truck-c-btn" id="truck-c-btn" onclick="toggleTruckC()">+ Add Truck C</button>
     </div>
     <div class="commit-wrap">
       <button class="commit-btn" id="commit-day-btn" onclick="commitDay()">Commit Day to Trello</button>
@@ -1433,6 +1471,7 @@ let state = {
   activeRightDay: 'MON',
   pendingSuggestion: null,
   lockedTrucks: {},      // { 'MON-W1-A': true }
+  showTruckC: false,     // hidden by default
   mapMarkers: {},
   mapRouteLines: {},
   unscheduledMarkers: [],
@@ -1640,7 +1679,8 @@ function recommend(card) {
       if (pDate.getTime() !== dDate.getTime()) continue;
     }
 
-    for (const truck of ['A','B','C']) {
+    const trucksToShow = ['A', 'B', ...( (state.showTruckC || Object.keys(state.schedule[key]?.C || {}).length > 0 || (state.schedule[key]?.C || []).length > 0) ? ['C'] : [] )];
+  for (const truck of trucksToShow) {
       const truckKey = `${key}-${truck}`;
       if (state.lockedTrucks[truckKey]) continue;
 
@@ -1970,8 +2010,12 @@ function renderRouteSheet() {
           stop.equipRemoval && '<span class="stop-flag flag-remove">RM</span>',
         ].filter(Boolean).join('');
 
-        html += `<div class="stop-item">
-          <div class="stop-num">${i+1}</div>
+        html += `<div class="stop-item" draggable="true"
+          ondragstart="dragStop(event,'${key}','${truck}',${i})"
+          ondragover="event.preventDefault();this.style.background='var(--surface3)'"
+          ondragleave="this.style.background=''"
+          ondrop="dropStop(event,'${key}','${truck}',${i});this.style.background=''">
+          <div class="stop-num drag-handle" title="Drag to reorder">⠿ ${i+1}</div>
           <div class="stop-content">
             <div class="stop-name">${stop.cardName || stop.name}</div>
             <div class="stop-meta">
@@ -2004,6 +2048,22 @@ function selectCard(cardId) {
   if (!card) return;
   state.selectedCard = card;
   renderQueue();
+
+  // Animate the map dot for this card
+  state.unscheduledMarkers.forEach((m, i) => {
+    const c = state.queueCards[i];
+    if (!c?.coords) return;
+    const el = m.getElement();
+    if (!el) return;
+    const dot = el.querySelector('.unscheduled-pin');
+    if (!dot) return;
+    if (c.id === cardId) {
+      dot.classList.add('selected');
+      map.panTo([c.coords.lat, c.coords.lng], { animate: true, duration: 0.5 });
+    } else {
+      dot.classList.remove('selected');
+    }
+  });
 }
 
 function scheduleCard(cardId) {
@@ -2236,6 +2296,41 @@ function editStop(dayKey, truck, idx) {
   openAssignModal(stop, false);
 }
 
+let dragData = null;
+
+function dragStop(e, dayKey, truck, idx) {
+  dragData = { dayKey, truck, idx };
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function dropStop(e, dayKey, truck, toIdx) {
+  e.preventDefault();
+  if (!dragData) return;
+  const { dayKey: fromDay, truck: fromTruck, idx: fromIdx } = dragData;
+
+  // Only reorder within same truck for now
+  if (fromDay !== dayKey || fromTruck !== truck) {
+    showToast('Drag within same truck to reorder', 'info');
+    dragData = null;
+    return;
+  }
+
+  const stops = state.schedule[dayKey][truck];
+  const [moved] = stops.splice(fromIdx, 1);
+  stops.splice(toIdx, 0, moved);
+  dragData = null;
+  renderRightPanel();
+  renderMap();
+  showToast('Stop order updated', 'info');
+}
+
+function toggleTruckC() {
+  state.showTruckC = !state.showTruckC;
+  const btn = document.getElementById('truck-c-btn');
+  if (btn) btn.textContent = state.showTruckC ? '− Remove Truck C' : '+ Add Truck C';
+  renderRightPanel();
+}
+
 function toggleTruckLock(truckKey) {
   state.lockedTrucks[truckKey] = !state.lockedTrucks[truckKey];
   renderRightPanel();
@@ -2369,7 +2464,7 @@ async function loadData() {
 }
 
 async function loadDrivers() {
-  const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&fields=id,name,due,start`);
+  const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&fields=id,name,due,start&limit=50`);
   state.drivers = cards.map((c, i) => ({
     id: c.id,
     name: c.name,
@@ -2504,11 +2599,42 @@ async function loadScheduledCards() {
 // ════════════════════════════════════════════════════════
 // UI HELPERS
 // ════════════════════════════════════════════════════════
-function setDayFilter(day) {
-  state.activeDayFilter = day;
-  document.querySelectorAll('.day-pill').forEach(p => {
-    p.classList.toggle('active', p.dataset.day === day);
+function getNext10WorkingDays() {
+  const days = [];
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  while (days.length < 10) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) {
+      days.push(new Date(d));
+    }
+  }
+  return days;
+}
+
+function renderDayPills() {
+  const container = document.getElementById('map-controls');
+  if (!container) return;
+  const days = getNext10WorkingDays();
+  const dayNames = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let html = `<div class="day-pill ${state.activeDayFilter === 'ALL' ? 'active' : ''}" data-key="ALL" onclick="setDayFilter('ALL')"><span class="pill-day">ALL</span></div>`;
+  days.forEach(date => {
+    const key = `${dayNames[date.getDay()]}-${date.getMonth()+1}/${date.getDate()}`;
+    const isActive = state.activeDayFilter === key;
+    html += `<div class="day-pill ${isActive ? 'active' : ''}" data-key="${key}" onclick="setDayFilter('${key}')">
+      <span class="pill-day">${dayNames[date.getDay()]}</span>
+      <span class="pill-date">${date.getDate()} ${months[date.getMonth()]}</span>
+    </div>`;
   });
+  container.innerHTML = html;
+}
+
+function setDayFilter(key) {
+  state.activeDayFilter = key;
+  renderDayPills();
   renderMap();
 }
 
@@ -2605,6 +2731,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set default right panel day to next Monday
   const week1 = getWeekDates(0);
   state.activeRightDay = week1[0].key;
+
+  // Render dynamic day pills
+  renderDayPills();
 
   // Load data
   loadData();
