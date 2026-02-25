@@ -33,7 +33,7 @@ html, body { height: 100%; overflow: hidden; }
 body {
   font-family: 'DM Sans', sans-serif;
   background: #e8e4dc;
-  color: var(--text);
+  color: rgba(255,255,255,0.92);
   width: 100%;
   height: 100%;
   position: fixed;
@@ -54,16 +54,9 @@ body {
 
 .logo span { color: rgba(255,255,255,0.5); font-weight: 400; }
 
-.header-sep { width: 1px; height: 24px; background: var(--border2); }
+.header-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.14); }
 
-.sync-info {
-  font-size: 11px;
-  font-family: 'DM Mono', monospace;
-  color: var(--text3);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.sync-info { display: none; }
 
 .sync-dot {
   width: 6px; height: 6px;
@@ -85,20 +78,22 @@ body {
 }
 
 .btn-icon {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  border: 1px solid var(--border2);
-  background: var(--surface2);
-  color: var(--text2);
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(15,12,8,0.55);
+  backdrop-filter: var(--blur, blur(18px));
+  -webkit-backdrop-filter: var(--blur, blur(18px));
+  color: rgba(255,255,255,0.5);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   transition: all 0.15s;
 }
 
-.btn-icon:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+.btn-icon:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.25); }
 
 .btn-primary {
   height: 32px;
@@ -126,8 +121,8 @@ body {
   gap: 7px;
   padding: 4px 10px 4px 4px;
   border-radius: 20px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 
 .driver-chip.unavailable {
@@ -140,7 +135,7 @@ body {
   width: 26px; height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--border2);
+  border: 2px solid rgba(255,255,255,0.14);
 }
 
 .driver-chip.unavailable .driver-avatar { filter: grayscale(60%); }
@@ -148,18 +143,18 @@ body {
 .driver-name {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text);
+  color: rgba(255,255,255,0.92);
 }
 
 .driver-status {
   font-size: 10px;
   font-family: 'DM Mono', monospace;
-  color: var(--text2);
+  color: rgba(255,255,255,0.45);
 }
 
 .driver-chip.unavailable .driver-status { color: var(--danger); }
 
-.driver-bar-sep { font-size: 10px; color: var(--border2); }
+.driver-bar-sep { font-size: 10px; color: rgba(255,255,255,0.14); }
 
 /* ── LAYOUT ──────────────────────────────────────────── */
 .workspace {
@@ -184,27 +179,32 @@ body {
 }
 
 .panel-header {
+  background: var(--card-bg, rgba(15,12,8,0.62));
+  backdrop-filter: var(--blur, blur(18px));
+  -webkit-backdrop-filter: var(--blur, blur(18px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  border-radius: var(--radius) var(--radius) 0 0;
   padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .panel-title {
   font-family: 'Syne', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text2);
+  color: var(--text2, rgba(255,255,255,0.45));
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .badge {
-  background: var(--surface3);
-  border: 1px solid var(--border2);
-  color: var(--text2);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.45);
   font-size: 10px;
   font-family: 'DM Mono', monospace;
   padding: 2px 7px;
@@ -214,25 +214,25 @@ body {
 .badge.has-items { background: rgba(240,201,58,0.1); border-color: rgba(240,201,58,0.3); color: var(--accent); }
 
 .panel-search {
-  margin-top: 8px;
   position: relative;
+  margin-top: 6px;
 }
 
 .panel-search input {
   width: 100%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 7px 10px 7px 30px;
-  color: var(--text);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 7px 10px 7px 28px;
+  color: var(--text, rgba(255,255,255,0.92));
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
   outline: none;
   transition: border-color 0.2s;
 }
 
-.panel-search input:focus { border-color: var(--info); }
-.panel-search input::placeholder { color: var(--text3); }
+.panel-search input:focus { border-color: rgba(240,201,58,0.5); }
+.panel-search input::placeholder { color: rgba(255,255,255,0.22); }
 
 .panel-search::before {
   content: '🔍';
@@ -245,14 +245,23 @@ body {
 }
 
 .cards-list {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   overflow-y: auto;
-  padding: 8px;
+  max-height: calc(100vh - 180px);
+  padding: 6px;
+  background: rgba(10,8,5,0.3);
+  backdrop-filter: var(--blur, blur(18px));
+  -webkit-backdrop-filter: var(--blur, blur(18px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .cards-list::-webkit-scrollbar { width: 4px; }
 .cards-list::-webkit-scrollbar-track { background: transparent; }
-.cards-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.cards-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 2px; }
 
 /\* Queue card \*/
 .queue-card {
@@ -279,13 +288,7 @@ body {
 .queue-card.has-warning { border-left: 3px solid var(--danger); }
 .queue-card.has-warning-soft { border-left: 3px solid var(--accent); }
 
-.qc-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 5px;
-  line-height: 1.3;
-}
+.qc-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.9); margin-bottom: 5px; line-height: 1.3; }
 
 .qc-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
 
@@ -304,16 +307,9 @@ body {
 .tag-rs.flexible { background: rgba(110,207,150,0.1); color: var(--success); border: 1px solid rgba(110,207,150,0.2); }
 .tag-firststop { background: rgba(91,156,246,0.15); color: var(--info); border: 1px solid rgba(91,156,246,0.25); }
 .tag-warning { background: rgba(224,122,95,0.12); color: var(--danger); border: 1px solid rgba(224,122,95,0.25); }
-.tag-service { background: rgba(255,255,255,0.06); color: var(--text2); border: 1px solid var(--card-border); }
+.tag-service { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.45); border: 1px solid var(--card-border); }
 
-.qc-address {
-  font-size: 10px;
-  color: var(--text3);
-  font-family: 'DM Mono', monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.qc-address { font-size: 10px; color: rgba(255,255,255,0.3); font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .qc-actions { display: flex; gap: 6px; margin-top: 8px; }
 
@@ -323,7 +319,7 @@ body {
   border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.05);
-  color: var(--text2);
+  color: rgba(255,255,255,0.45);
   font-size: 11px;
   font-family: 'DM Sans', sans-serif;
   cursor: pointer;
@@ -331,7 +327,7 @@ body {
   text-align: center;
 }
 
-.qc-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+.qc-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.92); }
 .qc-btn.primary { background: rgba(240,201,58,0.1); border-color: rgba(240,201,58,0.3); color: var(--accent); }
 .qc-btn.primary:hover { background: rgba(240,201,58,0.2); }
 
@@ -353,19 +349,14 @@ body {
 
 /\* Empty state \*/
 .empty-state {
-  background: var(--card-bg);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
   text-align: center;
   padding: 32px 20px;
-  color: var(--text3);
+  color: rgba(255,255,255,0.25);
 }
 
 .empty-state .icon { font-size: 28px; margin-bottom: 10px; }
-.empty-state .title { font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
-.empty-state .sub { font-size: 11px; line-height: 1.6; }
+.empty-state .title { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.35); margin-bottom: 6px; }
+.empty-state .sub { font-size: 11px; line-height: 1.6; color: rgba(255,255,255,0.2); }
 
 /* ── CENTER MAP ───────────────────────────────────────── */
 .map-container {
@@ -411,17 +402,17 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
-  color: var(--text2);
+  color: rgba(255,255,255,0.45);
   user-select: none;
   text-align: center;
   line-height: 1.2;
 }
 
 .pill-day { display: block; letter-spacing: 0.04em; font-weight: 600; }
-.pill-date { display: block; font-size: 9px; color: var(--text3); margin-top: 1px; font-weight: 400; }
+.pill-date { display: block; font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 1px; font-weight: 400; }
 
-.day-pill:hover { color: var(--text); background: rgba(255,255,255,0.08); }
-.day-pill:hover .pill-date { color: var(--text2); }
+.day-pill:hover { color: rgba(255,255,255,0.92); background: rgba(255,255,255,0.08); }
+.day-pill:hover .pill-date { color: rgba(255,255,255,0.45); }
 .day-pill.active { color: #000 !important; font-weight: 600; background: var(--accent); border-color: var(--accent); }
 .day-pill.active .pill-date { color: rgba(0,0,0,0.55); }
 
@@ -440,9 +431,13 @@ body {
 }
 
 .day-tabs {
+  background: var(--card-bg, rgba(15,12,8,0.62));
+  backdrop-filter: var(--blur, blur(18px));
+  -webkit-backdrop-filter: var(--blur, blur(18px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  border-radius: var(--radius);
   display: flex;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+  overflow: hidden;
   flex-shrink: 0;
 }
 
@@ -450,58 +445,65 @@ body {
 
 .day-tab {
   flex: 1;
-  min-width: 50px;
-  padding: 10px 4px 8px;
+  padding: 9px 4px 7px;
   text-align: center;
   cursor: pointer;
   transition: all 0.15s;
   border-bottom: 2px solid transparent;
   font-size: 10px;
   font-family: 'DM Mono', monospace;
-  color: var(--text3);
+  color: rgba(255,255,255,0.35);
   user-select: none;
 }
 
-.day-tab:hover { color: var(--text2); background: var(--surface2); }
-.day-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.day-tab:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.04); }
+.day-tab.active { color: rgba(255,255,255,0.9); border-bottom-color: var(--accent); }
 .day-tab .tab-label { font-weight: 600; letter-spacing: 0.04em; }
-.day-tab .tab-count { font-size: 9px; margin-top: 2px; color: var(--text3); }
-.day-tab.active .tab-count { color: var(--text2); }
+.day-tab .tab-count { font-size: 9px; margin-top: 2px; color: rgba(255,255,255,0.22); }
+.day-tab.active .tab-count { color: rgba(255,255,255,0.45); }
 
 .route-panel {
-  flex: 1;
   overflow-y: auto;
-  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 160px);
+  padding: 2px 0;
 }
 
 .route-panel::-webkit-scrollbar { width: 4px; }
 .route-panel::-webkit-scrollbar-track { background: transparent; }
-.route-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.route-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 2px; }
 
 /* Truck section */
-.truck-section { margin-bottom: 14px; }
+.truck-section {
+  background: var(--card-bg, rgba(15,12,8,0.62));
+  backdrop-filter: var(--blur, blur(18px));
+  -webkit-backdrop-filter: var(--blur, blur(18px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+}
 
 .truck-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  background: var(--surface2);
-  border-radius: 8px 8px 0 0;
-  border: 1px solid var(--border);
-  border-bottom: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .truck-driver-img {
   width: 24px; height: 24px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--border2);
+  border: 2px solid rgba(255,255,255,0.14);
 }
 
 .truck-info { flex: 1; }
-.truck-name { font-size: 12px; font-weight: 600; color: var(--text); }
-.truck-label { font-size: 10px; color: var(--text2); font-family: 'DM Mono', monospace; }
+.truck-name { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.9); }
+.truck-label { font-size: 10px; color: rgba(255,255,255,0.4); font-family: 'DM Mono', monospace; margin-top: 1px; }
 
 .capacity-bar-wrap {
   display: flex;
@@ -517,7 +519,7 @@ body {
 .cap-dot {
   width: 8px; height: 8px;
   border-radius: 2px;
-  background: var(--border2);
+  background: rgba(255,255,255,0.14);
   transition: background 0.2s;
 }
 
@@ -527,9 +529,9 @@ body {
 .truck-lock-btn {
   width: 22px; height: 22px;
   border-radius: 5px;
-  border: 1px solid var(--border2);
+  border: 1px solid rgba(255,255,255,0.14);
   background: transparent;
-  color: var(--text3);
+  color: rgba(255,255,255,0.22);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -538,36 +540,32 @@ body {
   transition: all 0.15s;
 }
 
-.truck-lock-btn:hover { background: var(--surface3); color: var(--text2); }
+.truck-lock-btn:hover { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.45); }
 .truck-lock-btn.locked { background: rgba(224,122,95,0.1); border-color: rgba(224,122,95,0.3); color: var(--danger); }
 
 /* Stop items */
 .stops-list {
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  overflow: hidden;
+  border-top: 1px solid rgba(255,255,255,0.06);
 }
 
 .stop-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  background: var(--surface2);
-  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
   transition: background 0.15s;
   position: relative;
 }
 
 .stop-item:last-child { border-bottom: none; }
-.stop-item:hover { background: var(--surface3); }
+.stop-item:hover { background: rgba(255,255,255,0.04); }
 
 .stop-num {
-  width: 24px; height: 20px;
+  width: 22px; height: 22px;
   border-radius: 6px;
-  background: var(--surface3);
-  border: 1px solid var(--border2);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -575,7 +573,8 @@ body {
   font-family: 'DM Mono', monospace;
   font-weight: 600;
   flex-shrink: 0;
-  color: var(--text2);
+  color: rgba(255,255,255,0.5);
+  cursor: grab;
 }
 
 .drag-handle {
@@ -588,8 +587,8 @@ body {
 .stop-item[draggable="true"]:hover { cursor: grab; }
 
 .stop-content { flex: 1; min-width: 0; }
-.stop-name { font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stop-meta { font-size: 10px; color: var(--text2); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
+.stop-name { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-meta { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
 
 .stop-flag {
   font-size: 9px;
@@ -614,9 +613,9 @@ body {
 .stop-btn {
   width: 22px; height: 22px;
   border-radius: 5px;
-  border: 1px solid var(--border2);
-  background: var(--surface3);
-  color: var(--text3);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.22);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -625,7 +624,7 @@ body {
   transition: all 0.15s;
 }
 
-.stop-btn:hover { background: var(--surface); color: var(--text); }
+.stop-btn:hover { background: rgba(15,12,8,0.62); color: rgba(255,255,255,0.92); }
 .stop-btn.remove:hover { background: rgba(224,122,95,0.1); border-color: rgba(224,122,95,0.3); color: var(--danger); }
 
 /* Route endpoints */
@@ -633,10 +632,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  background: rgba(45,55,72,0.4);
+  padding: 5px 12px;
+  background: rgba(255,255,255,0.03);
   font-size: 10px;
-  color: var(--text3);
+  color: rgba(255,255,255,0.3);
   font-family: 'DM Mono', monospace;
 }
 
@@ -644,22 +643,15 @@ body {
 
 /* Empty truck */
 .truck-empty {
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 8px 8px;
   padding: 16px;
   text-align: center;
-  background: var(--surface2);
   font-size: 11px;
-  color: var(--text3);
+  color: rgba(255,255,255,0.2);
+  font-style: italic;
 }
 
 /* Commit button */
-.commit-wrap {
-  padding: 8px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
+.commit-wrap { display: none; }
 
 .commit-btn {
   width: 100%;
@@ -676,7 +668,7 @@ body {
 }
 
 .commit-btn:hover { background: #f5d660; }
-.commit-btn:disabled { background: var(--border); color: var(--text3); cursor: not-allowed; }
+.commit-btn:disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.22); cursor: not-allowed; }
 
 /* ── DRIVER PICKER ── */
 .driver-picker {
@@ -698,7 +690,7 @@ body {
 .driver-picker-title {
   font-size: 10px;
   font-family: 'DM Mono', monospace;
-  color: var(--text3);
+  color: rgba(255,255,255,0.22);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 4px 6px 8px;
@@ -728,8 +720,8 @@ body {
 }
 
 .driver-option-info { flex: 1; }
-.driver-option-name { font-size: 12px; font-weight: 600; color: var(--text); }
-.driver-option-status { font-size: 10px; color: var(--text2); margin-top: 1px; }
+.driver-option-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); }
+.driver-option-status { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 1px; }
 .driver-option-status.away { color: var(--danger); }
 .driver-option-status.soon { color: var(--accent); }
 
@@ -737,8 +729,8 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(6px);
   z-index: 2000;
   display: none;
   align-items: center;
@@ -759,7 +751,7 @@ body {
   max-height: 90vh;
   overflow-y: auto;
   animation: modalIn 0.2s ease;
-  color: var(--text);
+  color: rgba(255,255,255,0.92);
 }
 
 @keyframes modalIn {
@@ -774,10 +766,10 @@ body {
   margin-bottom: 4px;
 }
 
-.modal-sub { font-size: 12px; color: var(--text2); margin-bottom: 20px; }
+.modal-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-bottom: 20px; }
 
 .form-group { margin-bottom: 16px; }
-.form-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; font-weight: 500; display: block; }
+.form-label { font-size: 11px; color: rgba(255,255,255,0.45); margin-bottom: 6px; font-weight: 500; display: block; }
 
 .form-select, .form-input {
   width: 100%;
@@ -785,7 +777,7 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
   padding: 9px 12px;
-  color: var(--text);
+  color: rgba(255,255,255,0.92);
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
   outline: none;
@@ -807,16 +799,16 @@ body {
   flex: 1;
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid var(--border2);
-  background: var(--surface2);
-  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.92);
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.btn-cancel:hover { background: var(--surface3); }
+.btn-cancel:hover { background: rgba(255,255,255,0.04); }
 
 .btn-confirm {
   flex: 2;
@@ -844,7 +836,7 @@ body {
 }
 
 .first-stop-title { font-size: 11px; color: var(--info); font-weight: 600; margin-bottom: 4px; }
-.first-stop-desc { font-size: 11px; color: var(--text2); }
+.first-stop-desc { font-size: 11px; color: rgba(255,255,255,0.45); }
 
 .first-stop-btns { display: flex; gap: 6px; margin-top: 8px; }
 .fs-btn {
@@ -856,9 +848,9 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
-  border: 1px solid var(--border2);
-  background: var(--surface3);
-  color: var(--text2);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.45);
   text-align: center;
 }
 
@@ -872,11 +864,13 @@ body {
 
 .truck-c-btn {
   width: 100%;
-  padding: 7px;
-  border-radius: 8px;
-  border: 1px dashed var(--border2);
-  background: transparent;
-  color: var(--text3);
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px dashed rgba(255,255,255,0.15);
+  background: rgba(15,12,8,0.45);
+  backdrop-filter: var(--blur, blur(18px));
+  -webkit-backdrop-filter: var(--blur, blur(18px));
+  color: rgba(255,255,255,0.3);
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
   cursor: pointer;
@@ -891,15 +885,37 @@ body {
   bottom: 20px;
   left: 20px;
   z-index: 400;
-  display: flex;
-  align-items: center;
-  gap: 12px;
   pointer-events: none;
-  background: none;
-  border: none;
 }
 
-.brand-logo { height: 42px; display: block; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.25)); }
+.brand-logo {
+  height: 38px;
+  display: block;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35));
+  opacity: 0.92;
+}
+
+.brand-byline {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.32);
+  letter-spacing: 0.06em;
+  margin-left: 2px;
+}
+
+.brand-sync {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 2px;
+}
+
+.brand-sync span {
+  font-size: 9px;
+  color: rgba(255,255,255,0.22);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.02em;
+}
 
 .brand-logo { height: 22px; display: block; }
 .brand-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); }
@@ -927,18 +943,21 @@ body {
 }
 
 .toast {
-  background: var(--surface2);
-  border: 1px solid var(--border2);
+  background: rgba(15,12,8,0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 12px;
+  color: rgba(255,255,255,0.9);
   max-width: 280px;
   display: flex;
   align-items: center;
   gap: 8px;
   animation: toastIn 0.3s ease;
   pointer-events: all;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
 }
 
 @keyframes toastIn {
@@ -985,24 +1004,25 @@ body {
 }
 
 .unscheduled-pin {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--text3);
-  border: 2px solid var(--surface2);
-  animation: pulseDot 2s infinite;
+  background: rgba(240,201,58,0.7);
+  border: 2px solid rgba(255,255,255,0.6);
+  box-shadow: 0 0 0 3px rgba(240,201,58,0.2);
+  cursor: pointer;
   transition: all 0.2s;
+  animation: pulseDot 2s infinite;
 }
 
 .unscheduled-pin.selected {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   background: var(--accent);
   border-color: #fff;
-  border-width: 2px;
   margin: -3px;
   animation: pulseSelected 1s infinite;
-  box-shadow: 0 0 0 4px rgba(240,201,58,0.3);
+  box-shadow: 0 0 0 5px rgba(240,201,58,0.25), 0 0 0 10px rgba(240,201,58,0.1);
 }
 
 @keyframes pulseDot {
@@ -1048,8 +1068,8 @@ body {
 .settings-overlay.open { display: flex; }
 
 .settings-panel {
-  background: var(--surface);
-  border: 1px solid var(--border2);
+  background: rgba(15,12,8,0.62);
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: 14px;
   padding: 28px;
   width: 440px;
@@ -1065,19 +1085,19 @@ body {
   margin-bottom: 4px;
 }
 
-.settings-sub { font-size: 12px; color: var(--text2); margin-bottom: 24px; }
+.settings-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-bottom: 24px; }
 
 .settings-section { margin-bottom: 20px; }
 
 .settings-section-title {
   font-size: 10px;
   font-family: 'DM Mono', monospace;
-  color: var(--text2);
+  color: rgba(255,255,255,0.45);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .connect-btn {
@@ -1103,8 +1123,8 @@ body {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
   font-size: 12px;
   margin-top: 8px;
 }
@@ -1124,8 +1144,8 @@ body {
 .confirm-dialog.open { display: flex; }
 
 .confirm-box {
-  background: var(--surface);
-  border: 1px solid var(--border2);
+  background: rgba(15,12,8,0.62);
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: 12px;
   padding: 24px;
   width: 340px;
@@ -1135,7 +1155,7 @@ body {
 
 .confirm-icon { font-size: 28px; margin-bottom: 12px; }
 .confirm-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-.confirm-msg { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 20px; }
+.confirm-msg { font-size: 12px; color: rgba(255,255,255,0.45); line-height: 1.5; margin-bottom: 20px; }
 
 .confirm-actions { display: flex; gap: 8px; }
 
@@ -1143,9 +1163,9 @@ body {
   flex: 1;
   padding: 9px;
   border-radius: 8px;
-  border: 1px solid var(--border2);
-  background: var(--surface2);
-  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.92);
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
   cursor: pointer;
@@ -1166,37 +1186,41 @@ body {
 
 /* Tooltip popup */
 .leaflet-popup-content-wrapper {
-  background: var(--surface2) !important;
-  border: 1px solid var(--border2) !important;
-  border-radius: 10px !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
-  color: var(--text) !important;
+  background: rgba(12,10,7,0.88) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border: 1px solid rgba(255,255,255,0.13) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
+  color: rgba(255,255,255,0.88) !important;
 }
 
-.leaflet-popup-tip { background: var(--surface2) !important; }
-.leaflet-popup-content { margin: 12px 14px !important; font-family: 'DM Sans', sans-serif !important; }
+.leaflet-popup-tip-container { display: none !important; }
+.leaflet-popup-close-button { color: rgba(255,255,255,0.3) !important; font-size: 16px !important; top: 8px !important; right: 10px !important; }
+.leaflet-popup-close-button:hover { color: rgba(255,255,255,0.8) !important; }
+.leaflet-popup-content { margin: 14px 16px !important; font-family: 'DM Sans', sans-serif !important; min-width: 200px; }
 
-.popup-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-.popup-row { font-size: 11px; color: var(--text2); margin-bottom: 3px; display: flex; gap: 6px; align-items: flex-start; }
-.popup-link { font-size: 11px; color: var(--info); text-decoration: none; margin-top: 6px; display: block; }
-.popup-link:hover { text-decoration: underline; }
+.popup-title { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.95); margin-bottom: 10px; line-height: 1.3; font-family: 'Syne', sans-serif; }
+.popup-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0; }
+.popup-row { font-size: 11px; color: rgba(255,255,255,0.55); margin-bottom: 5px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; }
+.popup-row strong { color: rgba(255,255,255,0.85); font-weight: 500; }
+.popup-row .popup-icon { opacity: 0.6; flex-shrink: 0; }
+.popup-tag { display: inline-block; font-size: 9px; font-family: 'DM Mono', monospace; padding: 2px 7px; border-radius: 4px; margin: 2px 2px 0 0; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.popup-tag.first { background: rgba(91,156,246,0.18); color: #5b9cf6; border: 1px solid rgba(91,156,246,0.25); }
+.popup-tag.flexible { background: rgba(110,207,150,0.15); color: #6ecf96; border: 1px solid rgba(110,207,150,0.2); }
+.popup-tag.asap { background: rgba(240,201,58,0.15); color: #f0c93a; border: 1px solid rgba(240,201,58,0.2); }
+.popup-tag.remove { background: rgba(224,122,95,0.15); color: #e07a5f; border: 1px solid rgba(224,122,95,0.2); }
+.popup-tag.service { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.1); }
+.popup-driver-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.popup-driver-img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+.popup-driver-info { flex: 1; }
+.popup-driver-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.9); }
+.popup-driver-phone { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+.popup-link { font-size: 11px; color: rgba(240,201,58,0.8); text-decoration: none; margin-top: 8px; display: inline-block; transition: color 0.15s; }
+.popup-link:hover { color: #f0c93a; text-decoration: underline; }
 </style>
 </head>
 <body>
-
-  <div class="header-sep"></div>
-  <div class="sync-info">
-    <div class="sync-dot" id="sync-dot"></div>
-    <span id="sync-label">Connecting...</span>
-  </div>
-  <div class="header-actions">
-    <button class="btn-icon" onclick="refreshData()" title="Refresh">↻</button>
-    <button class="btn-icon" onclick="openSettings()" title="Settings">⚙</button>
-    <button class="btn-primary" id="commit-all-btn" onclick="commitAll()" style="display:none">🚛 Commit Schedule</button>
-  </div>
-</div>
-
-</div>
 
 <!-- WORKSPACE -->
 <div class="workspace">
@@ -1339,7 +1363,7 @@ body {
 
     <div class="settings-section">
       <div class="settings-section-title">About</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7">
         <div>📋 Board: CF ASANA</div>
         <div>🗓 Schedule window: 2 weeks</div>
         <div>🚛 Stop cap: 4 per truck</div>
@@ -1348,7 +1372,7 @@ body {
       </div>
     </div>
 
-    <button class="connect-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border2);" onclick="closeModal('settings-overlay')">Close</button>
+    <button class="connect-btn" style="background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.92);border:1px solid rgba(255,255,255,0.14);" onclick="closeModal('settings-overlay')">Close</button>
   </div>
 </div>
 
@@ -1772,25 +1796,76 @@ function renderMap() {
   }
 
   // Unscheduled dots
-  if (activeFilter === 'ALL') {
-    state.queueCards.forEach(card => {
+  if (activeFilter === 'ALL' || !activeFilter) {
+    state.queueCards.forEach((card, idx) => {
       if (!card.coords) return;
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin() })
-        .bindTooltip(card.name, { direction: 'top' })
+        .bindPopup(buildQueuePopupHTML(card), { maxWidth: 260, minWidth: 220 })
         .addTo(map);
+      marker._cardId = card.id;
       state.unscheduledMarkers.push(marker);
     });
   }
 }
 
 function buildPopupHTML(stop) {
+  // Find which driver is assigned to this stop
+  const dayKey = stop.dayKey || state.activeRightDay;
+  const truck = stop.truck || '';
+  const driver = state.truckAssignments?.[dayKey]?.[truck]
+    || state.drivers?.find(d => d.assignedTruck === truck);
+  const driverFirstName = driver?.name?.split(' ')[0]?.toLowerCase() || '';
+
+  const tags = [
+    stop.firstStopApproved && `<span class="popup-tag first">First Stop</span>`,
+    stop.rs === 'ASAP' && `<span class="popup-tag asap">ASAP</span>`,
+    stop.rs === 'FLEXIBLE' && `<span class="popup-tag flexible">Flexible</span>`,
+    stop.weightGate && `<span class="popup-tag service">Weight Gate</span>`,
+    stop.equipRemoval && `<span class="popup-tag remove">Equip Removal</span>`,
+  ].filter(Boolean).join('');
+
   return `<div>
+    ${driver ? `
+    <div class="popup-driver-row">
+      <img class="popup-driver-img" src="assets/${driverFirstName}.png" onerror="this.style.display='none'" alt="${driver.name}" />
+      <div class="popup-driver-info">
+        <div class="popup-driver-name">${driver.name}</div>
+        <div class="popup-driver-phone">${driver.phone || 'No phone on file'}</div>
+      </div>
+    </div>` : ''}
     <div class="popup-title">${stop.cardName || stop.name}</div>
-    ${stop.customerName ? `<div class="popup-row">👤 ${stop.customerName}</div>` : ''}
-    ${stop.customerPhone ? `<div class="popup-row">📞 ${stop.customerPhone}</div>` : '<div class="popup-row" style="color:var(--text3)">📞 No contact on file</div>'}
-    ${stop.invTotal ? `<div class="popup-row">💰 $${stop.invTotal}</div>` : ''}
-    ${stop.flags?.length ? `<div class="popup-row">${stop.flags.join(' · ')}</div>` : ''}
-    <a class="popup-link" href="https://trello.com/c/${stop.cardShortId}" target="_blank">Open in Trello →</a>
+    ${stop.address ? `<div class="popup-row"><span class="popup-icon">📍</span><strong>${stop.address}</strong></div>` : ''}
+    <div class="popup-divider"></div>
+    ${stop.customerName ? `<div class="popup-row"><span class="popup-icon">👤</span> ${stop.customerName}</div>` : ''}
+    ${stop.customerPhone ? `<div class="popup-row"><span class="popup-icon">📞</span> <strong>${stop.customerPhone}</strong></div>` : '<div class="popup-row" style="opacity:0.3">📞 No contact on file</div>'}
+    ${stop.salesperson ? `<div class="popup-row"><span class="popup-icon">🧑‍💼</span> ${stop.salesperson}</div>` : ''}
+    ${stop.invTotal ? `<div class="popup-row"><span class="popup-icon">💰</span> $${parseFloat(stop.invTotal).toLocaleString()}</div>` : ''}
+    ${tags ? `<div style="margin-top:8px;">${tags}</div>` : ''}
+    ${stop.notes ? `<div class="popup-divider"></div><div class="popup-row" style="font-style:italic;opacity:0.7">💬 ${stop.notes}</div>` : ''}
+    <a class="popup-link" href="https://trello.com/c/${stop.cardShortId || stop.shortLink}" target="_blank">Open in Trello →</a>
+  </div>`;
+}
+
+function buildQueuePopupHTML(card) {
+  const tags = [
+    card.rs && `<span class="popup-tag ${card.rs === 'ASAP' ? 'asap' : card.rs === 'FLEXIBLE' ? 'flexible' : 'service'}">${card.rs}</span>`,
+    card.firstStop && `<span class="popup-tag first">First Stop</span>`,
+    card.weightGate && `<span class="popup-tag service">Weight Gate</span>`,
+    card.equipRemoval && `<span class="popup-tag remove">Equip Removal</span>`,
+    card.stairs && `<span class="popup-tag service">Stairs</span>`,
+  ].filter(Boolean).join('');
+
+  return `<div>
+    <div class="popup-title">${card.name}</div>
+    ${card.address ? `<div class="popup-row"><span class="popup-icon">📍</span> <strong>${card.address}</strong></div>` : ''}
+    <div class="popup-divider"></div>
+    ${card.customerName ? `<div class="popup-row"><span class="popup-icon">👤</span> ${card.customerName}</div>` : ''}
+    ${card.customerPhone ? `<div class="popup-row"><span class="popup-icon">📞</span> <strong>${card.customerPhone}</strong></div>` : '<div class="popup-row" style="opacity:0.3">📞 No contact on file</div>'}
+    ${card.salesperson ? `<div class="popup-row"><span class="popup-icon">🧑‍💼</span> ${card.salesperson}</div>` : ''}
+    ${card.invTotal ? `<div class="popup-row"><span class="popup-icon">💰</span> $${parseFloat(card.invTotal).toLocaleString()}</div>` : ''}
+    ${tags ? `<div style="margin-top:8px;">${tags}</div>` : ''}
+    ${card.notes ? `<div class="popup-divider"></div><div class="popup-row" style="font-style:italic;opacity:0.7">💬 ${card.notes}</div>` : ''}
+    <a class="popup-link" href="https://trello.com/c/${card.shortLink}" target="_blank">Open in Trello →</a>
   </div>`;
 }
 
@@ -2683,13 +2758,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- BRAND FLOAT -->
 <div class="brand-float">
-  <img src="assets/cf-logo.png" class="brand-logo" alt="Charlie's Fixtures" />
-  <div style="display:flex;flex-direction:column;gap:0px;">
-    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:rgba(255,255,255,0.95);letter-spacing:-0.03em;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,0.35);">DISPATCH</span>
-    <span style="font-size:10px;color:rgba(255,255,255,0.38);font-family:'DM Sans',sans-serif;letter-spacing:0.03em;margin-top:2px;">by William Sy</span>
-    <div style="display:flex;align-items:center;gap:5px;margin-top:5px;">
+  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
+    <img src="assets/dispatch-logo.png" class="brand-logo" alt="Dispatch" />
+    <span class="brand-byline">by: will.powah</span>
+    <div class="brand-sync">
       <div class="sync-dot" id="sync-dot"></div>
-      <span id="sync-label" style="font-size:9px;color:rgba(255,255,255,0.28);font-family:'DM Mono',monospace;letter-spacing:0.02em;">Connecting...</span>
+      <span id="sync-label">Connecting...</span>
     </div>
   </div>
 </div>
