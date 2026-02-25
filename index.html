@@ -34,6 +34,10 @@ body {
   font-family: 'DM Sans', sans-serif;
   background: #e8e4dc;
   color: var(--text);
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  overflow: hidden;
 }
 
 /* ── HEADER ──────────────────────────────────────────── */
@@ -162,7 +166,11 @@ body {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
 }
+
+.workspace > * { pointer-events: all; }
 
 /* ── LEFT PANEL ──────────────────────────────────────── */
 .panel-left {
@@ -361,12 +369,14 @@ body {
 
 /* ── CENTER MAP ───────────────────────────────────────── */
 .map-container {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
 }
 
 #map {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
@@ -378,6 +388,8 @@ body {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 3px;
   z-index: 500;
   background: var(--glass);
@@ -387,6 +399,7 @@ body {
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
   box-shadow: var(--shadow);
+  pointer-events: all;
 }
 
 .day-pill {
@@ -891,6 +904,17 @@ body {
 
 .brand-logo { height: 22px; display: block; }
 .brand-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); }
+
+/* ── ACTION FLOAT ── */
+.action-float {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 600;
+  display: flex;
+  gap: 6px;
+  pointer-events: all;
+}
 
 /* ── TOAST ───────────────────────────────────────────── */
 .toast-container {
@@ -2662,10 +2686,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- BRAND FLOAT -->
 <div class="brand-float">
   <img src="assets/cf-logo.png" class="brand-logo" alt="Charlie's Fixtures" />
-  <div class="brand-sep"></div>
-  <div class="sync-info">
-    <div class="sync-dot" id="sync-dot"></div>
-    <span id="sync-label">Connecting...</span>
+  <div style="display:flex;flex-direction:column;gap:2px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:rgba(255,255,255,0.9);letter-spacing:-0.01em;">DISPATCH</span>
+      <div class="brand-sep"></div>
+      <div class="sync-info">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">Connecting...</span>
+      </div>
+    </div>
+    <div style="font-size:9px;color:rgba(255,255,255,0.28);font-family:'DM Sans',sans-serif;letter-spacing:0.03em;">by William Sy</div>
   </div>
 </div>
 
