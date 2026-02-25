@@ -1359,6 +1359,307 @@ body {
 .popup-driver-phone { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
 .popup-link { font-size: 11px; color: rgba(240,201,58,0.8); text-decoration: none; margin-top: 8px; display: inline-block; transition: color 0.15s; }
 .popup-link:hover { color: #f0c93a; text-decoration: underline; }
+/* ══════════════════════════════════════════════════════════════
+   APPLE WARM GLASS THEME — Inter font, warm gray frosted panels
+   ══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  color: rgba(0,0,0,0.85) !important;
+}
+
+/* ── GLASS PANELS ── */
+.queue-panel,
+.route-panel-wrap {
+  background: rgba(200,195,185,0.45) !important;
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(255,255,255,0.1) !important;
+  border-radius: 16px !important;
+}
+
+.day-pills-bar {
+  background: rgba(200,195,185,0.45) !important;
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.5) !important;
+  border-radius: 16px !important;
+}
+
+.route-day-header {
+  background: rgba(0,0,0,0.03) !important;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+
+.truck-section {
+  background: rgba(200,195,185,0.3) !important;
+  border: 1px solid rgba(255,255,255,0.3) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.04) !important;
+}
+
+.queue-card {
+  background: rgba(200,195,185,0.3) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+.queue-card:hover {
+  background: rgba(200,195,185,0.4) !important;
+  border-color: rgba(255,255,255,0.35) !important;
+}
+
+/* ── BUTTONS ── */
+.btn-icon {
+  background: rgba(200,195,185,0.35) !important;
+  border: 1px solid rgba(255,255,255,0.3) !important;
+  color: rgba(0,0,0,0.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.btn-icon:hover {
+  background: rgba(200,195,185,0.5) !important;
+  color: rgba(0,0,0,0.75) !important;
+}
+
+.qc-btn {
+  background: rgba(0,0,0,0.04) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  border-radius: 8px !important;
+  color: rgba(0,0,0,0.55) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.qc-btn:hover {
+  background: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.75) !important;
+}
+.qc-actions .qc-btn:first-child {
+  background: rgba(240,201,58,0.12) !important;
+  border-color: rgba(240,201,58,0.3) !important;
+  color: #8a6d00 !important;
+}
+.qc-actions .qc-btn:first-child:hover {
+  background: rgba(240,201,58,0.2) !important;
+}
+
+.panel-search input {
+  background: rgba(0,0,0,0.04) !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  border-radius: 10px !important;
+  color: rgba(0,0,0,0.8) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.panel-search input::placeholder { color: rgba(0,0,0,0.3) !important; }
+
+/* ── TEXT: Primary ── */
+.panel-title, .qc-title, .truck-name, .stop-name, .route-day-name,
+.driver-option-name, .driver-picker-title, .modal-title, .settings-title,
+.suggestion-detail, .popup-title {
+  color: rgba(0,0,0,0.85) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.route-day-name, .popup-title, .modal-title, .settings-title {
+  font-family: 'Syne', sans-serif !important;
+}
+
+/* ── TEXT: Secondary ── */
+.truck-label, .stop-meta, .popup-row, .brand-byline, .modal-sub,
+.form-label, .settings-sub, .confirm-msg, .driver-option-status,
+.popup-driver-phone, .suggestion-meta, .first-stop-desc, .tag-service {
+  color: rgba(0,0,0,0.5) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ── TEXT: Tertiary ── */
+.qc-address, .route-day-meta, .brand-sync span, .route-empty,
+.empty-state .sub, .pill-date {
+  color: rgba(0,0,0,0.35) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ── DAY PILLS ── */
+.day-pill {
+  color: rgba(0,0,0,0.55) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.day-pill:hover {
+  color: rgba(0,0,0,0.75) !important;
+  background: rgba(0,0,0,0.05) !important;
+}
+.pill-date { font-family: 'Inter', sans-serif !important; }
+.day-pill:hover .pill-date { color: rgba(0,0,0,0.5) !important; }
+.day-pill.active {
+  color: #0f0c08 !important;
+  background: var(--accent) !important;
+  border-color: rgba(240,201,58,0.6) !important;
+  box-shadow: 0 2px 12px rgba(240,201,58,0.25) !important;
+}
+.day-pill.active .pill-date { color: rgba(0,0,0,0.5) !important; }
+
+/* ── STOP ITEMS ── */
+.stop-item { border-bottom-color: rgba(0,0,0,0.05) !important; }
+.stop-item:hover { background: rgba(0,0,0,0.03) !important; }
+.stop-num {
+  background: rgba(0,0,0,0.05) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.5) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.stop-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter', sans-serif !important; }
+.stop-meta { color: rgba(0,0,0,0.45) !important; font-family: 'Inter', sans-serif !important; }
+.stop-flag { font-family: 'Inter', sans-serif !important; }
+.stop-btn {
+  border-color: rgba(0,0,0,0.08) !important;
+  background: rgba(0,0,0,0.03) !important;
+  color: rgba(0,0,0,0.3) !important;
+}
+.stop-btn:hover { background: rgba(0,0,0,0.08) !important; color: rgba(0,0,0,0.7) !important; }
+.stop-btn.remove:hover { background: rgba(224,122,95,0.1) !important; border-color: rgba(224,122,95,0.3) !important; color: var(--danger) !important; }
+
+/* ── TRUCK DETAILS ── */
+.truck-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter', sans-serif !important; }
+.truck-label { color: rgba(0,0,0,0.45) !important; font-family: 'Inter', sans-serif !important; }
+.cap-dot { background: rgba(0,0,0,0.12) !important; }
+.cap-dot.filled { background: var(--success) !important; }
+.cap-dot.overflow { background: var(--danger) !important; }
+.truck-lock-btn { color: rgba(0,0,0,0.25) !important; border-color: rgba(0,0,0,0.06) !important; background: transparent !important; }
+.truck-lock-btn:hover { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.5) !important; }
+.truck-lock-btn.locked { background: rgba(224,122,95,0.1) !important; border-color: rgba(224,122,95,0.3) !important; color: var(--danger) !important; }
+.driver-placeholder-small { border-color: rgba(0,0,0,0.12) !important; color: rgba(0,0,0,0.2) !important; }
+
+.truck-c-btn {
+  background: rgba(0,0,0,0.03) !important;
+  border: 1px dashed rgba(0,0,0,0.1) !important;
+  color: rgba(0,0,0,0.35) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.truck-c-btn:hover { background: rgba(0,0,0,0.06) !important; color: rgba(0,0,0,0.5) !important; }
+
+/* ── COMMIT BUTTONS ── */
+.commit-btn { color: rgba(0,0,0,0.85) !important; font-family: 'Inter', sans-serif !important; }
+.commit-btn:not(:disabled) { box-shadow: 0 4px 20px rgba(240,201,58,0.3), inset 0 1px 0 rgba(255,255,255,0.3) !important; border-radius: 14px !important; }
+.commit-btn:disabled { background: rgba(0,0,0,0.06) !important; color: rgba(0,0,0,0.25) !important; }
+
+/* ── DRIVER PICKER ── */
+.driver-picker {
+  background: rgba(220,215,205,0.75) !important;
+  backdrop-filter: blur(40px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
+  border: 1px solid rgba(255,255,255,0.4) !important;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.12) !important;
+}
+.driver-picker-title { color: rgba(0,0,0,0.5) !important; font-family: 'Inter', sans-serif !important; }
+.driver-option:hover { background: rgba(0,0,0,0.04) !important; }
+.driver-option.selected { background: rgba(240,201,58,0.1) !important; }
+.driver-option-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter', sans-serif !important; }
+.driver-option-status { color: rgba(0,0,0,0.45) !important; font-family: 'Inter', sans-serif !important; }
+
+/* ── EMPTY STATES ── */
+.empty-state .title { color: rgba(0,0,0,0.4) !important; font-family: 'Inter', sans-serif !important; }
+.empty-state .sub { color: rgba(0,0,0,0.28) !important; font-family: 'Inter', sans-serif !important; }
+
+/* ── TAGS & BADGES ── */
+.tag { font-family: 'Inter', sans-serif !important; }
+.tag-service { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.45) !important; border: 1px solid rgba(0,0,0,0.06) !important; }
+.badge { background: var(--accent) !important; color: rgba(0,0,0,0.8) !important; }
+
+/* ── BRAND ── */
+.brand-byline { color: rgba(0,0,0,0.4) !important; font-family: 'Inter', sans-serif !important; }
+.brand-sync span { color: rgba(0,0,0,0.3) !important; font-family: 'Inter', sans-serif !important; }
+.sync-dot { background: #4caf50 !important; }
+
+/* ── ROUTE ENDPOINTS ── */
+.route-endpoint { color: rgba(0,0,0,0.35) !important; border-color: rgba(0,0,0,0.06) !important; font-family: 'Inter', sans-serif !important; }
+
+/* ── MODALS ── */
+.modal {
+  background: rgba(220,215,205,0.85) !important;
+  backdrop-filter: blur(40px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
+  border: 1px solid rgba(255,255,255,0.4) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+  color: rgba(0,0,0,0.85) !important;
+}
+.modal-title { color: rgba(0,0,0,0.85) !important; }
+.modal-sub { color: rgba(0,0,0,0.5) !important; font-family: 'Inter', sans-serif !important; }
+.form-label { color: rgba(0,0,0,0.5) !important; font-family: 'Inter', sans-serif !important; }
+.form-select, .form-input {
+  background: rgba(0,0,0,0.04) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.85) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.btn-cancel {
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  background: rgba(0,0,0,0.04) !important;
+  color: rgba(0,0,0,0.6) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.btn-cancel:hover { background: rgba(0,0,0,0.08) !important; }
+.btn-confirm { font-family: 'Inter', sans-serif !important; }
+.first-stop-desc { color: rgba(0,0,0,0.5) !important; font-family: 'Inter', sans-serif !important; }
+.fs-btn {
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  background: rgba(0,0,0,0.03) !important;
+  color: rgba(0,0,0,0.45) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ── SUGGESTION BANNER ── */
+.suggestion-banner {
+  background: rgba(200,195,185,0.5) !important;
+  backdrop-filter: blur(40px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+}
+.suggestion-detail { color: rgba(0,0,0,0.85) !important; font-family: 'Inter', sans-serif !important; }
+.suggestion-meta { color: rgba(0,0,0,0.45) !important; font-family: 'Inter', sans-serif !important; }
+.sug-btn { font-family: 'Inter', sans-serif !important; border: 1px solid rgba(0,0,0,0.08) !important; }
+.sug-btn.adjust { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.55) !important; }
+.sug-btn.dismiss { background: transparent !important; border-color: rgba(0,0,0,0.06) !important; color: rgba(0,0,0,0.3) !important; }
+
+/* ── LEAFLET POPUPS ── */
+.leaflet-popup-content-wrapper {
+  background: rgba(220,215,205,0.6) !important;
+  backdrop-filter: blur(40px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
+  border: 1px solid rgba(255,255,255,0.4) !important;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.12) !important;
+  border-radius: 14px !important;
+  color: rgba(0,0,0,0.8) !important;
+}
+.popup-title { color: rgba(0,0,0,0.85) !important; }
+.popup-row { color: rgba(0,0,0,0.5) !important; font-family: 'Inter', sans-serif !important; }
+.popup-row strong { color: rgba(0,0,0,0.7) !important; }
+.popup-driver-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter', sans-serif !important; }
+.popup-driver-phone { color: rgba(0,0,0,0.45) !important; font-family: 'Inter', sans-serif !important; }
+.popup-divider { background: rgba(0,0,0,0.08) !important; }
+.popup-tag { font-family: 'Inter', sans-serif !important; }
+.popup-tag.service { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.45) !important; border: 1px solid rgba(0,0,0,0.06) !important; }
+.popup-link { color: #8a6d00 !important; }
+.popup-link:hover { color: #6b5400 !important; }
+.leaflet-popup-close-button { color: rgba(0,0,0,0.3) !important; }
+.leaflet-popup-close-button:hover { color: rgba(0,0,0,0.7) !important; }
+
+/* ── SETTINGS ── */
+.settings-title { color: rgba(0,0,0,0.85) !important; }
+.settings-sub { color: rgba(0,0,0,0.5) !important; }
+.confirm-msg { color: rgba(0,0,0,0.5) !important; }
+
+/* ── SCROLLBAR ── */
+.cards-list::-webkit-scrollbar-thumb,
+.route-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1) !important; }
+
+/* ══════════════════════════════════════════════════════════════ */
 </style>
 </head>
 <body>
@@ -1505,7 +1806,7 @@ body {
 
     <div class="settings-section">
       <div class="settings-section-title">About</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7">
+      <div style="font-size:12px;color:rgba(0,0,0,0.5);line-height:1.7">
         <div>📋 Board: CF ASANA</div>
         <div>🗓 Schedule window: 2 weeks</div>
         <div>🚛 Stop cap: 4 per truck</div>
@@ -1514,7 +1815,7 @@ body {
       </div>
     </div>
 
-    <button class="connect-btn" style="background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.92);border:1px solid rgba(255,255,255,0.14);" onclick="closeModal('settings-overlay')">Close</button>
+    <button class="connect-btn" style="background:rgba(0,0,0,0.05);color:rgba(0,0,0,0.7);border:1px solid rgba(0,0,0,0.1);" onclick="closeModal('settings-overlay')">Close</button>
   </div>
 </div>
 
@@ -2157,7 +2458,7 @@ function renderRouteSheet() {
       <div class="truck-header">
         ${avatarHTML}
         <div class="truck-info">
-          <div class="truck-name">${driverName || '<span style="color:rgba(255,255,255,0.25);font-style:italic">No driver</span>'}</div>
+          <div class="truck-name">${driverName || '<span style="color:rgba(0,0,0,0.35);font-style:italic">No driver</span>'}</div>
           <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}${isUnavailable ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
@@ -2537,7 +2838,7 @@ function openDriverPicker(dayKey, truck, anchorEl) {
     html += `<div class="driver-option unassign" onclick="assignDriverToTruck('${dayKey}','${truck}',null)">
       <div class="driver-placeholder-small">✕</div>
       <div class="driver-option-info">
-        <div class="driver-option-name" style="color:rgba(255,255,255,0.45)">Remove driver</div>
+        <div class="driver-option-name" style="color:rgba(0,0,0,0.45)">Remove driver</div>
       </div>
     </div>`;
   }
