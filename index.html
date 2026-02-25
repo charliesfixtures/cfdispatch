@@ -10,27 +10,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #0d1117;
-  --surface: #161b27;
-  --surface2: #1c2233;
-  --surface3: #212840;
-  --border: #252d42;
-  --border2: #2e3850;
-  --text: #e6e9f0;
-  --text2: #7d8ba8;
-  --text3: #4a5568;
+  /* Warm slate — bridges the cool map and UI panels */
+  --bg: #1a1814;
+  --surface: #222018;
+  --surface2: #2a271e;
+  --surface3: #322f25;
+  --border: #3a3628;
+  --border2: #48432f;
+  --text: #f0ece2;
+  --text2: #9c9480;
+  --text3: #5c5645;
 
-  /* Day colors */
+  /* Day colors — slightly warmer */
   --mon: #f0c93a;
-  --tue: #4f8eff;
-  --wed: #7ed6a0;
+  --tue: #5b9cf6;
+  --wed: #6ecf96;
   --thu: #e07a5f;
-  --fri: #c084fc;
+  --fri: #b87fff;
 
   --accent: #f0c93a;
-  --success: #7ed6a0;
+  --success: #6ecf96;
   --danger: #e07a5f;
-  --info: #4f8eff;
+  --info: #5b9cf6;
 
   --panel-w: 300px;
   --header-h: 56px;
@@ -1733,7 +1734,7 @@ let map;
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView([34.02, -118.35], 11);
 
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=STADIA_API_KEY_PLACEHOLDER', {
+  L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=STADIA_API_KEY_PLACEHOLDER', {
     maxZoom: 18,
     attribution: '© Stadia Maps © OpenMapTiles © OpenStreetMap'
   }).addTo(map);
