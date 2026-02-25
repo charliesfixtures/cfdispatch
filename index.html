@@ -10,32 +10,38 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Warm slate — bridges the cool map and UI panels */
-  --bg: #1a1814;
-  --surface: #222018;
-  --surface2: #2a271e;
-  --surface3: #322f25;
-  --border: #3a3628;
-  --border2: #48432f;
-  --text: #f0ece2;
-  --text2: #9c9480;
-  --text3: #5c5645;
+  /* Glass morphism — panels float over the map */
+  --bg: transparent;
+  --surface: rgba(255,255,255,0.12);
+  --surface2: rgba(255,255,255,0.08);
+  --surface3: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.18);
+  --border2: rgba(255,255,255,0.10);
+  --text: #1a1a1a;
+  --text2: #444;
+  --text3: #888;
 
-  /* Day colors — slightly warmer */
-  --mon: #f0c93a;
-  --tue: #5b9cf6;
-  --wed: #6ecf96;
-  --thu: #e07a5f;
-  --fri: #b87fff;
+  /* Day colors */
+  --mon: #e6b800;
+  --tue: #3a7bd5;
+  --wed: #2eaa72;
+  --thu: #d4603a;
+  --fri: #9b59d4;
 
-  --accent: #f0c93a;
-  --success: #6ecf96;
-  --danger: #e07a5f;
-  --info: #5b9cf6;
+  --accent: #e6b800;
+  --success: #2eaa72;
+  --danger: #d4603a;
+  --info: #3a7bd5;
+
+  --glass-blur: blur(16px);
+  --glass-bg: rgba(255,255,255,0.75);
+  --glass-bg-dark: rgba(20,20,20,0.55);
+  --glass-border: rgba(255,255,255,0.35);
+  --shadow: 0 4px 24px rgba(0,0,0,0.12);
 
   --panel-w: 300px;
   --header-h: 56px;
-  --radius: 10px;
+  --radius: 12px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,7 +77,7 @@ body {
   white-space: nowrap;
 }
 
-.logo span { color: var(--text2); font-weight: 400; }
+.logo span { color: rgba(255,255,255,0.5); font-weight: 400; }
 
 .header-sep { width: 1px; height: 24px; background: var(--border2); }
 
@@ -280,14 +286,13 @@ body {
 
 /* Queue card */
 .queue-card {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 11px;
-  margin-bottom: 6px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: var(--radius);
+  padding: 10px 12px;
   cursor: pointer;
   transition: all 0.15s;
-  position: relative;
+  margin-bottom: 4px;
 }
 
 .queue-card:hover {
@@ -443,14 +448,16 @@ body {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1000;
   display: flex;
-  gap: 6px;
-  background: rgba(13,17,23,0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border2);
+  gap: 4px;
+  z-index: 500;
+  background: rgba(20,18,14,0.72);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 30px;
-  padding: 5px;
+  padding: 4px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
 .day-pill {
@@ -462,7 +469,7 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
-  color: var(--text2);
+  color: rgba(255,255,255,0.5);
   user-select: none;
   text-align: center;
   line-height: 1.2;
@@ -471,10 +478,11 @@ body {
 .pill-day { display: block; letter-spacing: 0.04em; font-weight: 600; }
 .pill-date { display: block; font-size: 9px; color: var(--text3); margin-top: 1px; font-weight: 400; }
 
-.day-pill:hover { color: var(--text); background: var(--surface2); }
-.day-pill:hover .pill-date { color: var(--text2); }
+.day-pill:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); }
+.day-pill:hover .pill-date { color: rgba(255,255,255,0.5); }
 .day-pill.active { color: #000 !important; font-weight: 600; background: var(--accent); border-color: var(--accent); }
 .day-pill.active .pill-date { color: rgba(0,0,0,0.6); }
+.pill-date { color: rgba(255,255,255,0.3); }
 
 .week-toggle {
   position: absolute;
