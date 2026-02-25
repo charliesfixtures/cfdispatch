@@ -80,17 +80,18 @@ body {
 .btn-icon {
   width: 34px; height: 34px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(15,12,8,0.55);
-  backdrop-filter: var(--blur, blur(18px));
-  -webkit-backdrop-filter: var(--blur, blur(18px));
-  color: rgba(255,255,255,0.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(12,10,7,0.55);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  color: rgba(255,255,255,0.45);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   transition: all 0.15s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .btn-icon:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.25); }
@@ -179,13 +180,14 @@ body {
 }
 
 .panel-header {
-  background: var(--card-bg, rgba(15,12,8,0.62));
-  backdrop-filter: var(--blur, blur(18px));
-  -webkit-backdrop-filter: var(--blur, blur(18px));
-  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  background: rgba(12,10,7,0.55);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius) var(--radius) 0 0;
   padding: 12px 14px 10px;
   flex-shrink: 0;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .panel-title {
@@ -372,7 +374,7 @@ body {
   height: 100%;
 }
 
-/\* Day layer toggles on map \*/
+/* Day layer toggles on map */
 .map-controls {
   position: fixed;
   top: 16px;
@@ -381,40 +383,41 @@ body {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  gap: 3px;
+  gap: 2px;
   z-index: 500;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 30px;
+  background: rgba(12,10,7,0.55);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 28px;
   padding: 4px;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  box-shadow: var(--shadow);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
   pointer-events: all;
 }
 
 .day-pill {
-  padding: 5px 10px;
-  border-radius: 20px;
+  padding: 6px 11px;
+  border-radius: 22px;
   font-size: 11px;
   font-family: 'DM Mono', monospace;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   border: 1px solid transparent;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.4);
   user-select: none;
   text-align: center;
   line-height: 1.2;
+  position: relative;
 }
 
 .pill-day { display: block; letter-spacing: 0.04em; font-weight: 600; }
-.pill-date { display: block; font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 1px; font-weight: 400; }
+.pill-date { display: block; font-size: 9px; color: rgba(255,255,255,0.18); margin-top: 1px; font-weight: 400; transition: color 0.2s; }
 
-.day-pill:hover { color: rgba(255,255,255,0.92); background: rgba(255,255,255,0.08); }
-.day-pill:hover .pill-date { color: rgba(255,255,255,0.45); }
-.day-pill.active { color: #000 !important; font-weight: 600; background: var(--accent); border-color: var(--accent); }
-.day-pill.active .pill-date { color: rgba(0,0,0,0.55); }
+.day-pill:hover { color: rgba(255,255,255,0.88); background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.06); }
+.day-pill:hover .pill-date { color: rgba(255,255,255,0.4); }
+.day-pill.active { color: #0f0c08; font-weight: 700; background: var(--accent); border-color: rgba(240,201,58,0.6); box-shadow: 0 2px 12px rgba(240,201,58,0.25), inset 0 1px 0 rgba(255,255,255,0.2); }
+.day-pill.active .pill-date { color: rgba(15,12,8,0.6); }
 
 /* ── RIGHT PANEL ──────────────────────────────────────── */
 .panel-right {
@@ -431,14 +434,15 @@ body {
 }
 
 .day-tabs {
-  background: var(--card-bg, rgba(15,12,8,0.62));
-  backdrop-filter: var(--blur, blur(18px));
-  -webkit-backdrop-filter: var(--blur, blur(18px));
-  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  background: rgba(12,10,7,0.55);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius);
   display: flex;
   overflow: hidden;
   flex-shrink: 0;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .day-tabs::-webkit-scrollbar { display: none; }
@@ -452,15 +456,15 @@ body {
   border-bottom: 2px solid transparent;
   font-size: 10px;
   font-family: 'DM Mono', monospace;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.3);
   user-select: none;
 }
 
-.day-tab:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.04); }
-.day-tab.active { color: rgba(255,255,255,0.9); border-bottom-color: var(--accent); }
+.day-tab:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.04); }
+.day-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(240,201,58,0.04); }
 .day-tab .tab-label { font-weight: 600; letter-spacing: 0.04em; }
-.day-tab .tab-count { font-size: 9px; margin-top: 2px; color: rgba(255,255,255,0.22); }
-.day-tab.active .tab-count { color: rgba(255,255,255,0.45); }
+.day-tab .tab-count { font-size: 9px; margin-top: 2px; color: rgba(255,255,255,0.18); }
+.day-tab.active .tab-count { color: rgba(240,201,58,0.5); }
 
 .route-panel {
   overflow-y: auto;
@@ -477,13 +481,14 @@ body {
 
 /* Truck section */
 .truck-section {
-  background: var(--card-bg, rgba(15,12,8,0.62));
-  backdrop-filter: var(--blur, blur(18px));
-  -webkit-backdrop-filter: var(--blur, blur(18px));
-  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
+  background: rgba(12,10,7,0.55);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius);
   overflow: hidden;
   flex-shrink: 0;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .truck-header {
@@ -920,6 +925,48 @@ body {
 .brand-logo { height: 22px; display: block; }
 .brand-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); }
 
+/* ── SUGGESTION BANNER ── */
+.suggestion-banner {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 600;
+  background: rgba(15,12,8,0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(240,201,58,0.25);
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(240,201,58,0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  max-width: 520px;
+}
+
+.suggestion-banner.visible {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateX(-50%) translateY(0);
+}
+
+.suggestion-text { flex: 1; }
+.suggestion-label { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.suggestion-detail { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.92); }
+.suggestion-meta { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+.suggestion-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.sug-btn { padding: 6px 12px; border-radius: 7px; font-size: 11px; font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); transition: all 0.15s; }
+.sug-btn.confirm { background: rgba(240,201,58,0.15); border-color: rgba(240,201,58,0.35); color: var(--accent); }
+.sug-btn.confirm:hover { background: rgba(240,201,58,0.25); }
+.sug-btn.adjust { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+.sug-btn.adjust:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.92); }
+.sug-btn.dismiss { background: transparent; border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.35); padding: 6px 8px; }
+.sug-btn.dismiss:hover { color: var(--danger); border-color: rgba(224,122,95,0.3); }
+
 /* ── ACTION FLOAT ── */
 .action-float {
   position: fixed;
@@ -1280,12 +1327,16 @@ body {
     <div class="truck-c-wrap" id="truck-c-wrap">
       <button class="truck-c-btn" id="truck-c-btn" onclick="toggleTruckC()">+ Add Truck C</button>
     </div>
-    <div class="commit-wrap">
+    <div class="commit-wrap" style="display:flex;flex-direction:column;gap:6px;padding:0 0 6px;">
       <button class="commit-btn" id="commit-day-btn" onclick="commitDay()">Commit Day to Trello</button>
+      <button class="commit-btn" id="commit-all-btn" style="display:none;background:rgba(240,201,58,0.15);color:var(--accent);border:1px solid rgba(240,201,58,0.3);" onclick="commitAll()">Commit All Pending</button>
     </div>
   </div>
 
 </div>
+
+<!-- Hidden driver-chips container (used by renderDriverBar) -->
+<div id="driver-chips" style="display:none;"></div>
 
 <!-- ASSIGN MODAL -->
 <div class="modal-overlay" id="assign-modal">
@@ -1984,7 +2035,10 @@ function renderRouteSheet() {
 
   let html = '';
 
-  for (const truck of ['A','B','C']) {
+  const trucksToRender = ['A','B'];
+  if (state.showTruckC || (state.schedule[key]?.C || []).length > 0) trucksToRender.push('C');
+
+  for (const truck of trucksToRender) {
     const truckKey = `${key}-${truck}`;
     const stops = state.schedule[key]?.[truck] || [];
     const isLocked = state.lockedTrucks[truckKey];
@@ -2233,7 +2287,8 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
   renderQueue();
   renderRightPanel();
   renderMap();
-  document.getElementById('commit-all-btn').style.display = 'block';
+  const commitAllBtn = document.getElementById('commit-all-btn');
+  if (commitAllBtn) commitAllBtn.style.display = 'block';
 }
 
 function reoptimizeTruck(dayKey, truck) {
@@ -2429,7 +2484,8 @@ async function commitAll() {
   }
 
   if (total === 0) showToast('Nothing to commit', 'info');
-  document.getElementById('commit-all-btn').style.display = 'none';
+  const cab = document.getElementById('commit-all-btn');
+  if (cab) cab.style.display = 'none';
 }
 
 // ════════════════════════════════════════════════════════
@@ -2494,6 +2550,7 @@ async function loadDrivers() {
 
 function renderDriverBar() {
   const chips = document.getElementById('driver-chips');
+  if (!chips) return;
   chips.innerHTML = state.drivers.map(d => {
     const status = getDriverStatus(d);
     const imgSrc = `assets/${d.name.split(' ')[0].toLowerCase()}.png`;
@@ -2632,16 +2689,19 @@ function getNext10WorkingDays() {
 function renderDayPills() {
   const container = document.getElementById('map-controls');
   if (!container) return;
-  const days = getNext10WorkingDays();
-  const dayNames = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const week1 = getWeekDates(0);
+  const week2 = getWeekDates(1);
+  const allDays = [...week1, ...week2];
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  let html = `<div class="day-pill ${state.activeDayFilter === 'ALL' ? 'active' : ''}" data-key="ALL" onclick="setDayFilter('ALL')"><span class="pill-day">ALL</span></div>`;
-  days.forEach(date => {
-    const key = `${dayNames[date.getDay()]}-${date.getMonth()+1}/${date.getDate()}`;
-    const isActive = state.activeDayFilter === key;
-    html += `<div class="day-pill ${isActive ? 'active' : ''}" data-key="${key}" onclick="setDayFilter('${key}')">
-      <span class="pill-day">${dayNames[date.getDay()]}</span>
+  let html = `<div class="day-pill ${state.activeDayFilter === 'ALL' ? 'active' : ''}" onclick="setDayFilter('ALL')"><span class="pill-day">ALL</span></div>`;
+
+  allDays.forEach(({ day, date, key }) => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (date < today) return; // skip past days
+    const isActive = state.activeDayFilter === day;
+    html += `<div class="day-pill ${isActive ? 'active' : ''}" onclick="setDayFilter('${day}')">
+      <span class="pill-day">${day}</span>
       <span class="pill-date">${date.getDate()} ${months[date.getMonth()]}</span>
     </div>`;
   });
