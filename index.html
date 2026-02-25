@@ -166,21 +166,21 @@ body {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  pointer-events: none;
   z-index: 1;
 }
 
-.workspace > * { pointer-events: all; }
-
 /* ── LEFT PANEL ──────────────────────────────────────── */
 .panel-left {
-  width: var(--panel-w);
-  flex-shrink: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  width: 270px;
+  z-index: 400;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  gap: 6px;
+  max-height: calc(100vh - 32px);
+  pointer-events: all;
 }
 
 .panel-header {
@@ -435,7 +435,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - 100px);
+  pointer-events: all;
 }
 
 .day-tabs {
@@ -887,20 +888,18 @@ body {
 /* ── BRAND FLOAT ── */
 .brand-float {
   position: fixed;
-  bottom: 16px;
-  left: 16px;
+  bottom: 20px;
+  left: 20px;
   z-index: 400;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: var(--card-bg, rgba(15,12,8,0.62));
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  border: 1px solid var(--card-border, rgba(255,255,255,0.11));
-  border-radius: 30px;
-  padding: 6px 14px 6px 8px;
-  box-shadow: var(--shadow);
+  gap: 12px;
+  pointer-events: none;
+  background: none;
+  border: none;
 }
+
+.brand-logo { height: 42px; display: block; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.25)); }
 
 .brand-logo { height: 22px; display: block; }
 .brand-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); }
@@ -909,11 +908,10 @@ body {
 .action-float {
   position: fixed;
   top: 16px;
-  right: 16px;
+  right: 320px;
   z-index: 600;
   display: flex;
   gap: 6px;
-  pointer-events: all;
 }
 
 /* ── TOAST ───────────────────────────────────────────── */
@@ -2686,16 +2684,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- BRAND FLOAT -->
 <div class="brand-float">
   <img src="assets/cf-logo.png" class="brand-logo" alt="Charlie's Fixtures" />
-  <div style="display:flex;flex-direction:column;gap:2px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:rgba(255,255,255,0.9);letter-spacing:-0.01em;">DISPATCH</span>
-      <div class="brand-sep"></div>
-      <div class="sync-info">
-        <div class="sync-dot" id="sync-dot"></div>
-        <span id="sync-label">Connecting...</span>
-      </div>
+  <div style="display:flex;flex-direction:column;gap:0px;">
+    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:rgba(255,255,255,0.95);letter-spacing:-0.03em;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,0.35);">DISPATCH</span>
+    <span style="font-size:10px;color:rgba(255,255,255,0.38);font-family:'DM Sans',sans-serif;letter-spacing:0.03em;margin-top:2px;">by William Sy</span>
+    <div style="display:flex;align-items:center;gap:5px;margin-top:5px;">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label" style="font-size:9px;color:rgba(255,255,255,0.28);font-family:'DM Mono',monospace;letter-spacing:0.02em;">Connecting...</span>
     </div>
-    <div style="font-size:9px;color:rgba(255,255,255,0.28);font-family:'DM Sans',sans-serif;letter-spacing:0.03em;">by William Sy</div>
   </div>
 </div>
 
