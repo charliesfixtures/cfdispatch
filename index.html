@@ -466,6 +466,31 @@ body {
 .day-tab .tab-count { font-size: 9px; margin-top: 2px; color: rgba(255,255,255,0.18); }
 .day-tab.active .tab-count { color: rgba(240,201,58,0.5); }
 
+/* Route day header (replaces day tabs in right panel) */
+.route-day-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(12,10,7,0.55);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+
+.route-day-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.route-day-info { flex: 1; }
+.route-day-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); font-family: "Syne", sans-serif; }
+.route-day-meta { font-size: 10px; color: rgba(255,255,255,0.35); font-family: "DM Mono", monospace; margin-top: 1px; }
+
 .route-panel {
   overflow-y: auto;
   display: flex;
@@ -504,6 +529,75 @@ body {
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(255,255,255,0.14);
+}
+
+/* Driver avatar wrap — clickable */
+.truck-driver-avatar-wrap {
+  position: relative;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.truck-driver-avatar-wrap:hover { transform: scale(1.08); }
+.truck-driver-avatar-wrap:hover .truck-driver-img { border-color: var(--accent); }
+.truck-driver-avatar-wrap.unavailable .truck-driver-img { filter: grayscale(50%); border-color: var(--danger); }
+
+.driver-unavail-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(15,12,8,0.8);
+}
+
+/* Driver placeholder — empty circle with person icon */
+.truck-driver-placeholder {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.22);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.truck-driver-placeholder:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(240,201,58,0.06);
+  transform: scale(1.08);
+}
+
+/* Truck section warning state when driver unavailable */
+.truck-section.driver-warn { border-color: rgba(224,122,95,0.2); }
+
+/* Driver picker enhancements */
+.driver-option.unavailable-option { opacity: 0.5; }
+.driver-option.unavailable-option:hover { opacity: 0.7; }
+.driver-placeholder-small {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: rgba(255,255,255,0.3);
+  flex-shrink: 0;
 }
 
 .truck-info { flex: 1; }
@@ -1318,9 +1412,6 @@ body {
 
   <!-- RIGHT PANEL -->
   <div class="panel-right">
-    <div class="day-tabs" id="day-tabs">
-      <!-- populated by JS -->
-    </div>
     <div class="route-panel" id="route-panel">
       <!-- populated by JS -->
     </div>
@@ -1484,13 +1575,14 @@ let state = {
   selectedCard: null,
   activeDayFilter: 'ALL',
   activeWeek: 1,
-  activeRightDay: 'MON',
+  activeRightDay: 'MON-W1',
   pendingSuggestion: null,
   lockedTrucks: {},      // { 'MON-W1-A': true }
   showTruckC: false,     // hidden by default
   mapMarkers: {},
   mapRouteLines: {},
   unscheduledMarkers: [],
+  truckDrivers: {},      // { 'MON-W1-A': driverId, 'MON-W1-B': driverId } — manager-assigned per day
 };
 
 // ════════════════════════════════════════════════════════
@@ -1811,7 +1903,7 @@ function renderMap() {
     for (const [truck, stops] of Object.entries(daySchedule)) {
       if (!stops.length) continue;
 
-      const driver = state.drivers.find(d => d.assignedTruck === truck) || state.drivers[0];
+      const driver = getDriverForTruck(key, truck) || state.drivers[0];
       const routePoints = [FRUITLAND, ...stops.map(s => s.coords), HQ];
 
       // Route line
@@ -1863,8 +1955,8 @@ function buildPopupHTML(stop) {
   // Find which driver is assigned to this stop
   const dayKey = stop.dayKey || state.activeRightDay;
   const truck = stop.truck || '';
-  const driver = state.truckAssignments?.[dayKey]?.[truck]
-    || state.drivers?.find(d => d.assignedTruck === truck);
+  const driver = getDriverForTruck(dayKey, truck)
+    || state.drivers?.find(d => d.id === stop.driverId);
   const driverFirstName = driver?.name?.split(' ')[0]?.toLowerCase() || '';
 
   const tags = [
@@ -2007,24 +2099,10 @@ function buildQueueCard(card) {
 // RENDER RIGHT PANEL
 // ════════════════════════════════════════════════════════
 function renderRightPanel() {
-  renderDayTabs();
   renderRouteSheet();
 }
 
-function renderDayTabs() {
-  const tabs = document.getElementById('day-tabs');
-  const week = state.activeWeek;
-  const dates = getWeekDates(week - 1);
-
-  tabs.innerHTML = dates.map(({ day, key }) => {
-    const stops = Object.values(state.schedule[key] || {}).flat();
-    const isActive = state.activeRightDay === key;
-    return `<div class="day-tab ${isActive ? 'active' : ''}" onclick="setActiveDay('${key}')">
-      <div class="tab-label">${day}</div>
-      <div class="tab-count">${stops.length}</div>
-    </div>`;
-  }).join('');
-}
+// Day tabs removed — center pills now control right panel via setDayFilter()
 
 function renderRouteSheet() {
   const panel = document.getElementById('route-panel');
@@ -2033,7 +2111,18 @@ function renderRouteSheet() {
   const dates = [...getWeekDates(0), ...getWeekDates(1)];
   const dayInfo = dates.find(d => d.key === key);
 
-  let html = '';
+  const dayColor = DAY_COLORS[dayInfo?.day] || 'var(--accent)';
+  const dateLabel = dayInfo ? dayInfo.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : key;
+  const weekLabel = key.includes('W2') ? 'WK2' : 'WK1';
+  const totalStops = Object.values(state.schedule[key] || {}).flat().length;
+
+  let html = `<div class="route-day-header">
+    <div class="route-day-dot" style="background:${dayColor}"></div>
+    <div class="route-day-info">
+      <div class="route-day-name">${dateLabel}</div>
+      <div class="route-day-meta">${weekLabel} \u00b7 ${totalStops} stop${totalStops !== 1 ? 's' : ''}</div>
+    </div>
+  </div>`;
 
   const trucksToRender = ['A','B'];
   if (state.showTruckC || (state.schedule[key]?.C || []).length > 0) trucksToRender.push('C');
@@ -2043,21 +2132,33 @@ function renderRouteSheet() {
     const stops = state.schedule[key]?.[truck] || [];
     const isLocked = state.lockedTrucks[truckKey];
 
-    // Find assigned driver
-    const driver = state.drivers.find(d => d.assignedTruck === truck);
-    const driverName = driver ? driver.name.split(' ')[0] : `Truck ${truck}`;
+    // Get manager-assigned driver for this day+truck
+    const driver = getDriverForTruck(key, truck);
+    const driverName = driver ? driver.name.split(' ')[0] : null;
     const driverImg = driver ? `assets/${driver.name.split(' ')[0].toLowerCase()}.png` : '';
+    const driverStatus = driver ? getDriverStatus(driver) : null;
+    const isUnavailable = driverStatus && !driverStatus.available;
 
     const capDots = Array.from({length: MAX_STOPS}, (_, i) =>
       `<div class="cap-dot ${i < stops.length ? (stops.length > MAX_STOPS ? 'overflow' : 'filled') : ''}"></div>`
     ).join('');
 
-    html += `<div class="truck-section">
+    // Avatar HTML — either assigned driver photo or placeholder
+    const avatarHTML = driver
+      ? `<div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Click to change driver">
+          <img class="truck-driver-img" src="${driverImg}" onerror="this.style.background='#2e3850';this.src=''" alt="${driverName}" />
+          ${isUnavailable ? '<div class="driver-unavail-badge">!</div>' : ''}
+        </div>`
+      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Assign a driver">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>`;
+
+    html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''}">
       <div class="truck-header">
-        ${driverImg ? `<img class="truck-driver-img" src="${driverImg}" onerror="this.style.display='none'" alt="${driverName}">` : ''}
+        ${avatarHTML}
         <div class="truck-info">
-          <div class="truck-name">${driverName}</div>
-          <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}</div>
+          <div class="truck-name">${driverName || '<span style="color:rgba(255,255,255,0.25);font-style:italic">No driver</span>'}</div>
+          <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}${isUnavailable ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
         <button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}')" title="${isLocked ? 'Unlock route' : 'Lock route'}">
@@ -2240,10 +2341,10 @@ function confirmAssign() {
 
   if (!dayKey || !truck) { showToast('Please select a day and truck', 'error'); return; }
 
-  // Assign driver to truck for this day
-  if (driverId) {
-    const driver = state.drivers.find(d => d.id === driverId);
-    if (driver) driver.assignedTruck = truck;
+  // Assign driver to truck for this day (if selected)
+  if (driverId && dayKey) {
+    state.truckDrivers[`${dayKey}-${truck}`] = driverId;
+    saveTruckDrivers();
   }
 
   const pos = stopPos === 'auto' ? bestInsertPosition(state.schedule[dayKey]?.[truck] || [], card.coords) : parseInt(stopPos);
@@ -2409,6 +2510,126 @@ function toggleTruckLock(truckKey) {
 }
 
 // ════════════════════════════════════════════════════════
+// DRIVER PICKER (inline popover)
+// ════════════════════════════════════════════════════════
+let activeDriverPicker = null;
+
+function openDriverPicker(dayKey, truck, anchorEl) {
+  // Close any existing picker
+  closeDriverPicker();
+
+  const truckKey = `${dayKey}-${truck}`;
+  const currentDriverId = state.truckDrivers[truckKey] || null;
+
+  const picker = document.createElement('div');
+  picker.className = 'driver-picker';
+  picker.id = 'active-driver-picker';
+
+  // Position near the anchor
+  const rect = anchorEl.getBoundingClientRect();
+  picker.style.top = `${rect.bottom + 6}px`;
+  picker.style.left = `${rect.left}px`;
+
+  let html = `<div class="driver-picker-title">Assign driver · Truck ${truck}</div>`;
+
+  // "Unassign" option if currently assigned
+  if (currentDriverId) {
+    html += `<div class="driver-option unassign" onclick="assignDriverToTruck('${dayKey}','${truck}',null)">
+      <div class="driver-placeholder-small">✕</div>
+      <div class="driver-option-info">
+        <div class="driver-option-name" style="color:rgba(255,255,255,0.45)">Remove driver</div>
+      </div>
+    </div>`;
+  }
+
+  state.drivers.forEach(d => {
+    const status = getDriverStatus(d);
+    const firstName = d.name.split(' ')[0];
+    const imgSrc = `assets/${firstName.toLowerCase()}.png`;
+    const isSelected = d.id === currentDriverId;
+    const statusClass = !status.available ? 'away' : (status.label ? 'soon' : '');
+
+    // Check if this driver is already assigned to another truck on the same day
+    let alreadyAssigned = null;
+    for (const t of ['A','B','C']) {
+      if (t === truck) continue;
+      if (state.truckDrivers[`${dayKey}-${t}`] === d.id) {
+        alreadyAssigned = t;
+        break;
+      }
+    }
+
+    html += `<div class="driver-option ${isSelected ? 'selected' : ''} ${!status.available ? 'unavailable-option' : ''}" onclick="assignDriverToTruck('${dayKey}','${truck}','${d.id}')">
+      <img src="${imgSrc}" onerror="this.style.background='#2e3850';this.src=''" alt="${firstName}" />
+      <div class="driver-option-info">
+        <div class="driver-option-name">${firstName}${isSelected ? ' ✓' : ''}</div>
+        <div class="driver-option-status ${statusClass}">
+          ${!status.available ? status.label : (alreadyAssigned ? `on Truck ${alreadyAssigned}` : (status.label || 'Available'))}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  picker.innerHTML = html;
+  document.body.appendChild(picker);
+  activeDriverPicker = picker;
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', closeDriverPickerOutside);
+  }, 10);
+}
+
+function closeDriverPickerOutside(e) {
+  const picker = document.getElementById('active-driver-picker');
+  if (picker && !picker.contains(e.target)) {
+    closeDriverPicker();
+  }
+}
+
+function closeDriverPicker() {
+  const picker = document.getElementById('active-driver-picker');
+  if (picker) picker.remove();
+  activeDriverPicker = null;
+  document.removeEventListener('click', closeDriverPickerOutside);
+}
+
+function assignDriverToTruck(dayKey, truck, driverId) {
+  const truckKey = `${dayKey}-${truck}`;
+
+  if (driverId === null || driverId === 'null') {
+    delete state.truckDrivers[truckKey];
+    showToast(`Truck ${truck} driver removed`, 'info');
+  } else {
+    // Check if driver is unavailable — warn but still allow
+    const driver = state.drivers.find(d => d.id === driverId);
+    const status = driver ? getDriverStatus(driver) : null;
+
+    // If driver is on another truck same day, swap them
+    for (const t of ['A','B','C']) {
+      if (t === truck) continue;
+      if (state.truckDrivers[`${dayKey}-${t}`] === driverId) {
+        delete state.truckDrivers[`${dayKey}-${t}`];
+      }
+    }
+
+    state.truckDrivers[truckKey] = driverId;
+    const name = driver?.name?.split(' ')[0] || 'Driver';
+
+    if (status && !status.available) {
+      showToast(`⚠ ${name} assigned to Truck ${truck} — but ${status.label}`, 'error');
+    } else {
+      showToast(`${name} → Truck ${truck}`, 'success');
+    }
+  }
+
+  saveTruckDrivers();
+  closeDriverPicker();
+  renderRightPanel();
+  renderMap();
+}
+
+// ════════════════════════════════════════════════════════
 // COMMIT TO TRELLO
 // ════════════════════════════════════════════════════════
 async function commitDay() {
@@ -2537,15 +2758,30 @@ async function loadData() {
 
 async function loadDrivers() {
   const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&fields=id,name,due,start&limit=50`);
-  state.drivers = cards.map((c, i) => ({
+  state.drivers = cards.map((c) => ({
     id: c.id,
     name: c.name,
     photo: c.attachments?.find(a => a.previews?.length)?.previews?.slice(-1)[0]?.url || null,
-    assignedTruck: ['A','B','C'][i] || 'A',
     unavailableFrom: c.start || null,
     unavailableUntil: c.due || null,
   }));
-  renderDriverBar();
+
+  // Restore saved driver assignments from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('cf_dispatch_truck_drivers') || '{}');
+    state.truckDrivers = saved;
+  } catch { state.truckDrivers = {}; }
+}
+
+function saveTruckDrivers() {
+  localStorage.setItem('cf_dispatch_truck_drivers', JSON.stringify(state.truckDrivers));
+}
+
+function getDriverForTruck(dayKey, truck) {
+  const truckKey = `${dayKey}-${truck}`;
+  const driverId = state.truckDrivers[truckKey];
+  if (!driverId) return null;
+  return state.drivers.find(d => d.id === driverId) || null;
 }
 
 function renderDriverBar() {
@@ -2710,7 +2946,17 @@ function renderDayPills() {
 
 function setDayFilter(key) {
   state.activeDayFilter = key;
+
+  // Also update right panel to show the selected day's routes
+  if (key !== 'ALL') {
+    // Find the matching schedule key (e.g. MON → MON-W1 or MON-W2)
+    const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+    const match = allDays.find(d => d.day === key);
+    if (match) state.activeRightDay = match.key;
+  }
+
   renderDayPills();
+  renderRightPanel();
   renderMap();
 }
 
@@ -2719,13 +2965,12 @@ function setWeek(week) {
   document.querySelectorAll('.week-btn').forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.week) === week);
   });
-  renderDayTabs();
+  renderRightPanel();
 }
 
 function setActiveDay(key) {
   state.activeRightDay = key;
-  renderDayTabs();
-  renderRouteSheet();
+  renderRightPanel();
 }
 
 function filterQueue() { renderQueue(); }
