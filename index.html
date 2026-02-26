@@ -272,14 +272,19 @@ body {
   -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
-  padding: 10px 12px;
-  cursor: pointer;
-  transition: all 0.15s;
+  padding: 14px 16px;
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  position: relative;
 }
 
 .queue-card:hover {
-  border-color: rgba(255,255,255,0.22);
-  background: rgba(15,12,8,0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.queue-card:active {
+  cursor: grabbing;
 }
 
 .queue-card.selected {
@@ -287,33 +292,120 @@ body {
   background: rgba(240,201,58,0.08);
 }
 
+.queue-card.expanded {
+  background: rgba(170,165,155,0.45);
+}
+
 .queue-card.has-warning { border-left: 3px solid var(--danger); }
 .queue-card.has-warning-soft { border-left: 3px solid var(--accent); }
 
-.qc-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.9); margin-bottom: 5px; line-height: 1.3; }
+.queue-card.dragging { opacity: 0.4; transform: rotate(1deg); }
 
-.qc-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+.qc-title { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.55); margin-bottom: 5px; line-height: 1.25; padding-right: 38px; font-family: 'Inter Tight', sans-serif; }
+
+.qc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
 
 .qc-tag {
   font-size: 9px;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Inter Tight', sans-serif;
   padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
+  border-radius: 3px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.05);
+  border: none;
 }
 
-.tag-quadrant { background: rgba(91,156,246,0.12); color: var(--info); border: 1px solid rgba(91,156,246,0.2); }
-.tag-rs { background: rgba(240,201,58,0.1); color: var(--accent); border: 1px solid rgba(240,201,58,0.2); }
-.tag-rs.flexible { background: rgba(110,207,150,0.1); color: var(--success); border: 1px solid rgba(110,207,150,0.2); }
-.tag-firststop { background: rgba(91,156,246,0.15); color: var(--info); border: 1px solid rgba(91,156,246,0.25); }
-.tag-warning { background: rgba(224,122,95,0.12); color: var(--danger); border: 1px solid rgba(224,122,95,0.25); }
-.tag-service { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.45); border: 1px solid var(--card-border); }
+/* Algo recommendation strip */
+.algo-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  margin: 8px 0 0 0;
+  background: rgba(0,0,0,0.03);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'Inter Tight', sans-serif;
+  color: rgba(0,0,0,0.45);
+  font-weight: 500;
+}
+.algo-strip .algo-icon { font-size: 10px; opacity: 0.6; }
+.algo-strip .algo-label { color: rgba(0,0,0,0.55); font-weight: 600; }
+.algo-strip .algo-detail { color: rgba(0,0,0,0.38); }
+.algo-strip .algo-dist { margin-left: auto; color: rgba(0,0,0,0.3); font-size: 10px; }
 
-.qc-address { font-size: 10px; color: rgba(255,255,255,0.3); font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Requester avatar */
+.qc-avatar {
+  width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+  position: absolute; top: 12px; right: 14px;
+  border: 1.5px solid rgba(0,0,0,0.1); opacity: 0.85; z-index: 5;
+}
+.qc-avatar-initials {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(0,0,0,0.08);
+  position: absolute; top: 12px; right: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.4);
+  font-family: 'Inter Tight', sans-serif;
+}
 
-.qc-actions { display: flex; gap: 6px; margin-top: 8px; }
+/* Expanded card content */
+.qc-expanded-content {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  font-family: 'Inter Tight', sans-serif;
+}
+.qc-expanded-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: rgba(0,0,0,0.42);
+  padding: 3px 0;
+  font-family: 'Inter Tight', sans-serif;
+}
+.qc-expanded-row .exp-icon {
+  font-size: 12px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.qc-expanded-row strong {
+  color: rgba(0,0,0,0.52);
+  font-weight: 600;
+}
+.qc-expanded-row em {
+  font-style: italic;
+}
+.qc-expanded-divider {
+  height: 1px;
+  background: rgba(0,0,0,0.05);
+  margin: 6px 0;
+}
+.qc-expanded-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.qc-expanded-tags .exp-tag {
+  font-size: 9px;
+  padding: 2.5px 7px;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  background: rgba(0,0,0,0.05);
+  color: rgba(0,0,0,0.4);
+  font-family: 'Inter Tight', sans-serif;
+}
+
+.qc-address { display: none; }
+
+.qc-actions { display: none; }
 
 .qc-btn {
   flex: 1;
@@ -488,7 +580,7 @@ body {
 }
 
 .route-day-info { flex: 1; }
-.route-day-name { font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.9); font-family: "Inter Tight", sans-serif; }
+.route-day-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); font-family: "Syne", sans-serif; }
 .route-day-meta { font-size: 10px; color: rgba(255,255,255,0.35); font-family: "DM Mono", monospace; margin-top: 1px; }
 
 .route-panel {
@@ -1359,303 +1451,6 @@ body {
 .popup-driver-phone { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
 .popup-link { font-size: 11px; color: rgba(240,201,58,0.8); text-decoration: none; margin-top: 8px; display: inline-block; transition: color 0.15s; }
 .popup-link:hover { color: #f0c93a; text-decoration: underline; }
-/* ══════════════════════════════════════════════════════════════
-   APPLE WARM GLASS THEME — Inter font, warm gray frosted panels
-   ══════════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&display=swap');
-
-body {
-  font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  color: rgba(0,0,0,0.85) !important;
-}
-
-/* ── WARM GRAY GLASS — shared base ── */
-.panel-header,
-.cards-list,
-.map-controls,
-.route-day-header,
-.truck-section,
-.day-tabs {
-  background: rgba(200,195,185,0.5) !important;
-  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
-  border: 1px solid rgba(255,255,255,0.35) !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5) !important;
-}
-
-/* Panel-specific radius */
-.panel-header { border-radius: 16px 16px 0 0 !important; }
-.cards-list { border-radius: 0 0 16px 16px !important; border-top: none !important; }
-.map-controls { border-radius: 28px !important; }
-.route-day-header { border-radius: 12px !important; }
-.truck-section { border-radius: 14px !important; }
-
-/* ── Queue cards — slightly deeper for layering ── */
-.queue-card {
-  background: rgba(180,175,165,0.35) !important;
-  border: 1px solid rgba(255,255,255,0.3) !important;
-  border-radius: 12px !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-.queue-card:hover {
-  background: rgba(180,175,165,0.45) !important;
-  border-color: rgba(255,255,255,0.4) !important;
-}
-
-/* ── Truck header separator ── */
-.truck-header { border-bottom-color: rgba(0,0,0,0.06) !important; }
-
-/* ── BUTTONS ── */
-.btn-icon {
-  background: rgba(200,195,185,0.4) !important;
-  border: 1px solid rgba(255,255,255,0.3) !important;
-  color: rgba(0,0,0,0.5) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.btn-icon:hover {
-  background: rgba(200,195,185,0.55) !important;
-  color: rgba(0,0,0,0.75) !important;
-}
-
-.qc-btn {
-  background: rgba(0,0,0,0.05) !important;
-  border: 1px solid rgba(0,0,0,0.08) !important;
-  border-radius: 8px !important;
-  color: rgba(0,0,0,0.55) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.qc-btn:hover {
-  background: rgba(0,0,0,0.1) !important;
-  color: rgba(0,0,0,0.75) !important;
-}
-.qc-actions .qc-btn:first-child {
-  background: rgba(240,201,58,0.15) !important;
-  border-color: rgba(240,201,58,0.35) !important;
-  color: #8a6d00 !important;
-}
-.qc-actions .qc-btn:first-child:hover {
-  background: rgba(240,201,58,0.25) !important;
-}
-
-.panel-search input {
-  background: rgba(0,0,0,0.05) !important;
-  border: 1px solid rgba(0,0,0,0.06) !important;
-  border-radius: 10px !important;
-  color: rgba(0,0,0,0.8) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.panel-search input::placeholder { color: rgba(0,0,0,0.3) !important; }
-
-/* ── TEXT: Primary ── */
-.panel-title, .qc-title, .truck-name, .stop-name, .route-day-name,
-.driver-option-name, .driver-picker-title, .modal-title, .settings-title,
-.suggestion-detail, .popup-title {
-  color: rgba(0,0,0,0.85) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.route-day-name, .popup-title, .modal-title, .settings-title {
-  font-family: 'Syne', sans-serif !important;
-}
-.route-day-name {
-  font-family: 'Inter Tight', sans-serif !important;
-  font-size: 16px !important;
-  font-weight: 600 !important;
-}
-
-/* ── TEXT: Secondary ── */
-.truck-label, .stop-meta, .popup-row, .brand-byline, .modal-sub,
-.form-label, .settings-sub, .confirm-msg, .driver-option-status,
-.popup-driver-phone, .suggestion-meta, .first-stop-desc, .tag-service,
-.panel-title {
-  color: rgba(0,0,0,0.5) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-
-/* ── TEXT: Tertiary ── */
-.qc-address, .route-day-meta, .brand-sync span, .route-empty,
-.empty-state .sub, .pill-date {
-  color: rgba(0,0,0,0.35) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-
-/* ── DAY PILLS ── */
-.day-pill:not(.active) {
-  color: rgba(0,0,0,0.55) !important;
-  background: transparent !important;
-  border-color: transparent !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.day-pill {
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.day-pill:hover:not(.active) {
-  color: rgba(0,0,0,0.75) !important;
-  background: rgba(0,0,0,0.06) !important;
-}
-.pill-date { font-family: 'Inter Tight', sans-serif !important; }
-.day-pill:hover .pill-date { color: rgba(0,0,0,0.5) !important; }
-.day-pill.active {
-  color: #0f0c08 !important;
-  font-weight: 700 !important;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
-}
-.day-pill.active .pill-date { color: rgba(0,0,0,0.5) !important; }
-
-/* ── STOP ITEMS ── */
-.stop-item { border-bottom-color: rgba(0,0,0,0.05) !important; }
-.stop-item:hover { background: rgba(0,0,0,0.03) !important; }
-.stop-num {
-  background: rgba(0,0,0,0.06) !important;
-  border: 1px solid rgba(0,0,0,0.08) !important;
-  color: rgba(0,0,0,0.5) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.stop-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter Tight', sans-serif !important; }
-.stop-meta { color: rgba(0,0,0,0.45) !important; font-family: 'Inter Tight', sans-serif !important; }
-.stop-flag { font-family: 'Inter Tight', sans-serif !important; }
-.stop-btn {
-  border-color: rgba(0,0,0,0.08) !important;
-  background: rgba(0,0,0,0.03) !important;
-  color: rgba(0,0,0,0.3) !important;
-}
-.stop-btn:hover { background: rgba(0,0,0,0.08) !important; color: rgba(0,0,0,0.7) !important; }
-.stop-btn.remove:hover { background: rgba(224,122,95,0.1) !important; border-color: rgba(224,122,95,0.3) !important; color: var(--danger) !important; }
-
-/* ── TRUCK DETAILS ── */
-.truck-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter Tight', sans-serif !important; }
-.truck-label { color: rgba(0,0,0,0.45) !important; font-family: 'Inter Tight', sans-serif !important; }
-.cap-dot { background: rgba(0,0,0,0.12) !important; }
-.cap-dot.filled { background: var(--success) !important; }
-.cap-dot.overflow { background: var(--danger) !important; }
-.truck-lock-btn { color: rgba(0,0,0,0.25) !important; border-color: rgba(0,0,0,0.06) !important; background: transparent !important; }
-.truck-lock-btn:hover { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.5) !important; }
-.truck-lock-btn.locked { background: rgba(224,122,95,0.1) !important; border-color: rgba(224,122,95,0.3) !important; color: var(--danger) !important; }
-.driver-placeholder-small { border-color: rgba(0,0,0,0.12) !important; color: rgba(0,0,0,0.2) !important; }
-
-.truck-c-btn {
-  background: rgba(0,0,0,0.03) !important;
-  border: 1px dashed rgba(0,0,0,0.1) !important;
-  color: rgba(0,0,0,0.35) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.truck-c-btn:hover { background: rgba(0,0,0,0.06) !important; color: rgba(0,0,0,0.5) !important; }
-
-/* ── COMMIT BUTTONS ── */
-.commit-btn { color: rgba(0,0,0,0.85) !important; font-family: 'Inter Tight', sans-serif !important; }
-.commit-btn:not(:disabled) { box-shadow: 0 4px 20px rgba(240,201,58,0.3), inset 0 1px 0 rgba(255,255,255,0.3) !important; border-radius: 14px !important; }
-.commit-btn:disabled { background: rgba(0,0,0,0.06) !important; color: rgba(0,0,0,0.25) !important; }
-
-/* ── DRIVER PICKER ── */
-.driver-picker {
-  background: rgba(220,215,205,0.8) !important;
-  backdrop-filter: blur(40px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
-  border: 1px solid rgba(255,255,255,0.4) !important;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.12) !important;
-}
-.driver-picker-title { color: rgba(0,0,0,0.5) !important; font-family: 'Inter Tight', sans-serif !important; }
-.driver-option:hover { background: rgba(0,0,0,0.04) !important; }
-.driver-option.selected { background: rgba(240,201,58,0.1) !important; }
-.driver-option-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter Tight', sans-serif !important; }
-.driver-option-status { color: rgba(0,0,0,0.45) !important; font-family: 'Inter Tight', sans-serif !important; }
-
-/* ── EMPTY STATES ── */
-.empty-state .title { color: rgba(0,0,0,0.4) !important; font-family: 'Inter Tight', sans-serif !important; }
-.empty-state .sub { color: rgba(0,0,0,0.28) !important; font-family: 'Inter Tight', sans-serif !important; }
-
-/* ── TAGS & BADGES ── */
-.tag { font-family: 'Inter Tight', sans-serif !important; }
-.tag-service { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.45) !important; border: 1px solid rgba(0,0,0,0.06) !important; }
-.badge { background: var(--accent) !important; color: rgba(0,0,0,0.8) !important; border-color: rgba(240,201,58,0.4) !important; }
-
-/* ── BRAND ── */
-.brand-byline { color: rgba(0,0,0,0.4) !important; font-family: 'Inter Tight', sans-serif !important; }
-.brand-sync span { color: rgba(0,0,0,0.3) !important; font-family: 'Inter Tight', sans-serif !important; }
-.sync-dot { background: #4caf50 !important; }
-
-/* ── ROUTE ENDPOINTS ── */
-.route-endpoint { color: rgba(0,0,0,0.35) !important; border-color: rgba(0,0,0,0.06) !important; font-family: 'Inter Tight', sans-serif !important; }
-
-/* ── MODALS ── */
-.modal {
-  background: rgba(220,215,205,0.88) !important;
-  backdrop-filter: blur(40px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
-  border: 1px solid rgba(255,255,255,0.4) !important;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
-  color: rgba(0,0,0,0.85) !important;
-}
-.modal-title { color: rgba(0,0,0,0.85) !important; }
-.modal-sub { color: rgba(0,0,0,0.5) !important; font-family: 'Inter Tight', sans-serif !important; }
-.form-label { color: rgba(0,0,0,0.5) !important; font-family: 'Inter Tight', sans-serif !important; }
-.form-select, .form-input {
-  background: rgba(0,0,0,0.04) !important;
-  border: 1px solid rgba(0,0,0,0.08) !important;
-  color: rgba(0,0,0,0.85) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.btn-cancel {
-  border: 1px solid rgba(0,0,0,0.1) !important;
-  background: rgba(0,0,0,0.04) !important;
-  color: rgba(0,0,0,0.6) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-.btn-cancel:hover { background: rgba(0,0,0,0.08) !important; }
-.btn-confirm { font-family: 'Inter Tight', sans-serif !important; }
-.first-stop-desc { color: rgba(0,0,0,0.5) !important; font-family: 'Inter Tight', sans-serif !important; }
-.fs-btn {
-  border: 1px solid rgba(0,0,0,0.08) !important;
-  background: rgba(0,0,0,0.03) !important;
-  color: rgba(0,0,0,0.45) !important;
-  font-family: 'Inter Tight', sans-serif !important;
-}
-
-/* ── SUGGESTION BANNER ── */
-.suggestion-banner {
-  background: rgba(200,195,185,0.55) !important;
-  backdrop-filter: blur(40px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
-  border: 1px solid rgba(255,255,255,0.35) !important;
-}
-.suggestion-detail { color: rgba(0,0,0,0.85) !important; font-family: 'Inter Tight', sans-serif !important; }
-.suggestion-meta { color: rgba(0,0,0,0.45) !important; font-family: 'Inter Tight', sans-serif !important; }
-.sug-btn { font-family: 'Inter Tight', sans-serif !important; border: 1px solid rgba(0,0,0,0.08) !important; }
-.sug-btn.adjust { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.55) !important; }
-.sug-btn.dismiss { background: transparent !important; border-color: rgba(0,0,0,0.06) !important; color: rgba(0,0,0,0.3) !important; }
-
-/* ── LEAFLET POPUPS ── */
-.leaflet-popup-content-wrapper {
-  background: rgba(220,215,205,0.65) !important;
-  backdrop-filter: blur(40px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
-  border: 1px solid rgba(255,255,255,0.4) !important;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.12) !important;
-  border-radius: 14px !important;
-  color: rgba(0,0,0,0.8) !important;
-}
-.popup-title { color: rgba(0,0,0,0.85) !important; }
-.popup-row { color: rgba(0,0,0,0.5) !important; font-family: 'Inter Tight', sans-serif !important; }
-.popup-row strong { color: rgba(0,0,0,0.7) !important; }
-.popup-driver-name { color: rgba(0,0,0,0.85) !important; font-family: 'Inter Tight', sans-serif !important; }
-.popup-driver-phone { color: rgba(0,0,0,0.45) !important; font-family: 'Inter Tight', sans-serif !important; }
-.popup-divider { background: rgba(0,0,0,0.08) !important; }
-.popup-tag { font-family: 'Inter Tight', sans-serif !important; }
-.popup-tag.service { background: rgba(0,0,0,0.04) !important; color: rgba(0,0,0,0.45) !important; border: 1px solid rgba(0,0,0,0.06) !important; }
-.popup-link { color: #8a6d00 !important; }
-.popup-link:hover { color: #6b5400 !important; }
-.leaflet-popup-close-button { color: rgba(0,0,0,0.3) !important; }
-.leaflet-popup-close-button:hover { color: rgba(0,0,0,0.7) !important; }
-
-/* ── SCROLLBAR ── */
-.cards-list::-webkit-scrollbar-thumb,
-.route-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1) !important; }
-
-/* ══════════════════════════════════════════════════════════════ */
 </style>
 </head>
 <body>
@@ -1802,7 +1597,7 @@ body {
 
     <div class="settings-section">
       <div class="settings-section-title">About</div>
-      <div style="font-size:12px;color:rgba(0,0,0,0.5);line-height:1.7">
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7">
         <div>📋 Board: CF ASANA</div>
         <div>🗓 Schedule window: 2 weeks</div>
         <div>🚛 Stop cap: 4 per truck</div>
@@ -1811,7 +1606,7 @@ body {
       </div>
     </div>
 
-    <button class="connect-btn" style="background:rgba(0,0,0,0.05);color:rgba(0,0,0,0.7);border:1px solid rgba(0,0,0,0.1);" onclick="closeModal('settings-overlay')">Close</button>
+    <button class="connect-btn" style="background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.92);border:1px solid rgba(255,255,255,0.14);" onclick="closeModal('settings-overlay')">Close</button>
   </div>
 </div>
 
@@ -1874,6 +1669,7 @@ let state = {
   activeWeek: 1,
   activeRightDay: 'MON-W1',
   pendingSuggestion: null,
+  expandedCard: null,
   lockedTrucks: {},      // { 'MON-W1-A': true }
   showTruckC: false,     // hidden by default
   mapMarkers: {},
@@ -2191,7 +1987,7 @@ function renderMap() {
   const activeFilter = state.activeDayFilter;
 
   for (const { day, key } of allDays) {
-    if (activeFilter !== 'ALL' && key !== activeFilter) continue;
+    if (activeFilter !== 'ALL' && day !== activeFilter) continue;
 
     const weekNum = key.includes('W1') ? 1 : 2;
     const dayColor = DAY_COLORS[day];
@@ -2338,57 +2134,100 @@ function renderQueue() {
 }
 
 function buildQueueCard(card) {
-  const rsInfo = parseRS(card.rsValue);
   const isSelected = state.selectedCard?.id === card.id;
+  const isExpanded = state.expandedCard === card.id;
+  const warningClass = (!card.address || !card.coords) ? 'has-warning' : '';
 
-  let warningClass = '';
-  let warningTag = '';
-  if (!card.address) {
-    warningClass = 'has-warning';
-    warningTag = `<span class="qc-tag tag-warning">⚠ No location</span>`;
-  } else if (!card.coords) {
-    warningClass = 'has-warning-soft';
-    warningTag = `<span class="qc-tag tag-warning">⚠ Address unverified</span>`;
+  // Avatar (card owner / salesperson)
+  let avatarHtml = '';
+  if (card.requesterAvatar) {
+    avatarHtml = `<img class="qc-avatar" src="${card.requesterAvatar}" title="${card.requesterName || 'Card Owner'}" />`;
+  } else if (card.requesterName) {
+    const initials = card.requesterName.split(' ').map(n => n[0]).join('');
+    avatarHtml = `<div class="qc-avatar-initials" title="${card.requesterName}">${initials}</div>`;
   }
 
-  let rsTag = '';
-  if (rsInfo.type === 'date') {
-    rsTag = `<span class="qc-tag tag-rs">📅 ${rsInfo.date.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>`;
-  } else if (rsInfo.type === 'flexible' || rsInfo.type === 'unknown') {
-    rsTag = `<span class="qc-tag tag-rs flexible">Flexible</span>`;
-  } else if (rsInfo.type === 'past') {
-    rsTag = `<span class="qc-tag tag-warning">⚠ Past date</span>`;
+  // Tags — monotone
+  const quadrant = card.quadrant || '';
+  const rsInfo = parseRS(card.rsValue);
+  let rsDisplay = 'Flexible';
+  if (rsInfo.type === 'date') rsDisplay = rsInfo.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  else if (rsInfo.type === 'past') rsDisplay = '⚠ Past date';
+  else if (card.rsValue && card.rsValue !== '') rsDisplay = card.rsValue;
+
+  // Algo strip — graceful fail if no coords
+  let algoStrip = '';
+  if (!card.coords) {
+    algoStrip = `<div class="algo-strip" style="background:rgba(200,100,50,0.06)">
+      <span class="algo-icon" style="opacity:0.8">⚠</span>
+      <span style="color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Address required for routing</span>
+    </div>`;
+  } else {
+    const rec = recommend(card);
+    if (rec) {
+      const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
+      const wk = rec.dayKey.includes('W2') ? 'Wk2' : 'Wk1';
+      algoStrip = `<div class="algo-strip">
+        <span class="algo-icon">✦</span>
+        <span class="algo-label">${dayNames[rec.day]} ${wk}</span>
+        <span class="algo-detail">· Truck ${rec.truck} · Stop ${rec.insertPos + 1}</span>
+        <span class="algo-dist">${rec.minDist.toFixed(1)} mi</span>
+      </div>`;
+    } else {
+      algoStrip = `<div class="algo-strip" style="background:rgba(0,0,0,0.02)">
+        <span class="algo-icon" style="opacity:0.5">✦</span>
+        <span style="color:rgba(0,0,0,0.3);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">No available slot found</span>
+      </div>`;
+    }
   }
 
-  const quadrantTag = card.quadrant
-    ? `<span class="qc-tag tag-quadrant">${card.quadrant}</span>` : '';
+  // Expanded content with graceful fallbacks
+  let expandedHtml = '';
+  if (isExpanded) {
+    const nameLine = card.customerName
+      ? `<div class="qc-expanded-row"><span class="exp-icon">👤</span> <strong>${card.customerName}</strong></div>`
+      : `<div class="qc-expanded-row" style="color:rgba(0,0,0,0.25)"><span class="exp-icon">👤</span> <em>No customer name</em></div>`;
 
-  const firstStopTag = card.firstStopRequested
-    ? `<span class="qc-tag tag-firststop">🥇 First Stop</span>` : '';
+    const phoneLine = card.customerPhone
+      ? `<div class="qc-expanded-row"><span class="exp-icon">📞</span> ${card.customerPhone}</div>`
+      : `<div class="qc-expanded-row" style="color:rgba(180,90,40,0.5)"><span class="exp-icon">📞</span> <em>Contact info needed — update in Trello</em></div>`;
 
-  const serviceFlags = [
-    card.stairs && '🪜',
-    card.equipRemoval && '🔧',
-    card.whiteGlove && '🤍',
-    card.dropoff && '📦',
-  ].filter(Boolean).map(f => `<span class="qc-tag tag-service">${f}</span>`).join('');
+    const addressLine = card.address
+      ? `<div class="qc-expanded-row"><span class="exp-icon">📍</span> ${card.address}</div>`
+      : `<div class="qc-expanded-row" style="color:rgba(180,90,40,0.5)"><span class="exp-icon">📍</span> <em>Address required for scheduling</em></div>`;
 
-  const fixBtn = !card.address
-    ? `<a class="fix-btn" href="https://trello.com/c/${card.shortLink}" target="_blank">Add location in Trello →</a>` : '';
+    const serviceTags = [
+      card.stairs && '🪜 Stairs',
+      card.equipRemoval && '🔧 Removal',
+      card.whiteGlove && '🧤 White Glove',
+      card.firstStopRequested && '🥇 First Stop',
+      card.dropoff && '📦 Drop-Off',
+    ].filter(Boolean);
 
-  const canSchedule = card.address && card.coords;
+    expandedHtml = `<div class="qc-expanded-content">
+      ${nameLine}
+      ${phoneLine}
+      ${addressLine}
+      ${card.invTotal ? `<div class="qc-expanded-row"><span class="exp-icon">💰</span> $${parseFloat(card.invTotal).toLocaleString()}</div>` : ''}
+      ${serviceTags.length ? `<div class="qc-expanded-tags">${serviceTags.map(t => `<span class="exp-tag">${t}</span>`).join('')}</div>` : ''}
+      ${card.deliveryNotes ? `<div class="qc-expanded-divider"></div><div class="qc-expanded-row" style="font-style:italic;opacity:0.7"><span class="exp-icon">💬</span> ${card.deliveryNotes}</div>` : ''}
+    </div>`;
+  }
 
-  return `<div class="queue-card ${warningClass} ${isSelected ? 'selected' : ''}" onclick="selectCard('${card.id}')">
+  return `<div class="queue-card ${warningClass} ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}"
+    draggable="true"
+    onclick="toggleExpandCard('${card.id}')"
+    ondblclick="window.open('https://trello.com/c/${card.shortLink}','_blank')"
+    ondragstart="dragQueueCard(event,'${card.id}')"
+    ondragend="endDragQueueCard(event)">
+    ${avatarHtml}
     <div class="qc-title">${card.name}</div>
-    <div class="qc-meta">
-      ${quadrantTag}${rsTag}${firstStopTag}${warningTag}${serviceFlags}
+    <div class="qc-flags">
+      ${quadrant ? `<span class="qc-tag">${quadrant}</span>` : ''}
+      <span class="qc-tag">${rsDisplay}</span>
     </div>
-    ${card.address ? `<div class="qc-address">📍 ${card.address}</div>` : ''}
-    ${fixBtn}
-    ${canSchedule ? `<div class="qc-actions">
-      <div class="qc-btn primary" onclick="event.stopPropagation();scheduleCard('${card.id}')">✦ Schedule</div>
-      <a class="qc-btn" href="https://trello.com/c/${card.shortLink}" target="_blank" onclick="event.stopPropagation()">Trello</a>
-    </div>` : ''}
+    ${algoStrip}
+    ${expandedHtml}
   </div>`;
 }
 
@@ -2410,11 +2249,14 @@ function renderRouteSheet() {
 
   const dayColor = DAY_COLORS[dayInfo?.day] || 'var(--accent)';
   const dateLabel = dayInfo ? dayInfo.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : key;
+  const weekLabel = key.includes('W2') ? 'WK2' : 'WK1';
+  const totalStops = Object.values(state.schedule[key] || {}).flat().length;
 
   let html = `<div class="route-day-header">
     <div class="route-day-dot" style="background:${dayColor}"></div>
     <div class="route-day-info">
       <div class="route-day-name">${dateLabel}</div>
+      <div class="route-day-meta">${weekLabel} \u00b7 ${totalStops} stop${totalStops !== 1 ? 's' : ''}</div>
     </div>
   </div>`;
 
@@ -2451,7 +2293,7 @@ function renderRouteSheet() {
       <div class="truck-header">
         ${avatarHTML}
         <div class="truck-info">
-          <div class="truck-name">${driverName || '<span style="color:rgba(0,0,0,0.35);font-style:italic">No driver</span>'}</div>
+          <div class="truck-name">${driverName || '<span style="color:rgba(255,255,255,0.25);font-style:italic">No driver</span>'}</div>
           <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}${isUnavailable ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
@@ -2529,6 +2371,45 @@ function selectCard(cardId) {
       dot.classList.remove('selected');
     }
   });
+}
+
+function toggleExpandCard(cardId) {
+  const card = state.queueCards.find(c => c.id === cardId);
+  if (!card) return;
+
+  // Toggle expanded state
+  state.expandedCard = state.expandedCard === cardId ? null : cardId;
+  state.selectedCard = card;
+
+  // Pulse the map dot
+  state.unscheduledMarkers.forEach((m, i) => {
+    const c = state.queueCards[i];
+    if (!c?.coords) return;
+    const el = m.getElement();
+    if (!el) return;
+    const dot = el.querySelector('.unscheduled-pin');
+    if (!dot) return;
+    if (c.id === cardId) {
+      dot.classList.add('selected');
+      map.panTo([c.coords.lat, c.coords.lng], { animate: true, duration: 0.5 });
+    } else {
+      dot.classList.remove('selected');
+    }
+  });
+
+  renderQueue();
+}
+
+function dragQueueCard(e, cardId) {
+  e.dataTransfer.setData('text/plain', cardId);
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.classList.add('dragging');
+  state._draggingCardId = cardId;
+}
+
+function endDragQueueCard(e) {
+  e.target.classList.remove('dragging');
+  state._draggingCardId = null;
 }
 
 function scheduleCard(cardId) {
@@ -2831,7 +2712,7 @@ function openDriverPicker(dayKey, truck, anchorEl) {
     html += `<div class="driver-option unassign" onclick="assignDriverToTruck('${dayKey}','${truck}',null)">
       <div class="driver-placeholder-small">✕</div>
       <div class="driver-option-info">
-        <div class="driver-option-name" style="color:rgba(0,0,0,0.45)">Remove driver</div>
+        <div class="driver-option-name" style="color:rgba(255,255,255,0.45)">Remove driver</div>
       </div>
     </div>`;
   }
@@ -3025,7 +2906,7 @@ async function loadData() {
     }
 
     // Load cards from that list
-    const cards = await trello(`/lists/${rfsListId}/cards?customFieldItems=true&attachments=false&fields=id,name,shortLink,desc,due,dueStart,coordinates,address,locationName&pluginData=true`);
+    const cards = await trello(`/lists/${rfsListId}/cards?customFieldItems=true&attachments=false&fields=id,name,shortLink,desc,due,dueStart,coordinates,address,locationName&pluginData=true&members=true&member_fields=fullName,avatarUrl,username`);
 
     // Geocode addresses
     const processed = [];
@@ -3116,6 +2997,9 @@ async function processCard(card) {
   // Parse delivery instructions from card comments (submitted via request form)
   const commentData = parseDeliveryComment(card.desc || '');
 
+  // Card owner (assigned Trello member = salesperson)
+  const requester = card.members?.[0] || null;
+
   return {
     id: card.id,
     name: card.name,
@@ -3133,6 +3017,8 @@ async function processCard(card) {
     whiteGlove: commentData.whiteGlove,
     dropoff: commentData.dropoff,
     deliveryNotes: commentData.notes,
+    requesterName: requester?.fullName || null,
+    requesterAvatar: requester?.avatarUrl ? (requester.avatarUrl + '/50.png') : null,
     flags: [
       commentData.stairs && '🪜 Stairs',
       commentData.whiteGlove && '🤍 White Glove',
@@ -3229,10 +3115,8 @@ function renderDayPills() {
   allDays.forEach(({ day, date, key }) => {
     const today = new Date(); today.setHours(0,0,0,0);
     if (date < today) return; // skip past days
-    const isActive = state.activeDayFilter === key;
-    const dayColor = DAY_COLORS[day] || 'var(--accent)';
-    const activeStyle = isActive ? `background:${dayColor};border-color:${dayColor};` : '';
-    html += `<div class="day-pill ${isActive ? 'active' : ''}" style="${activeStyle}" onclick="setDayFilter('${key}')">
+    const isActive = state.activeDayFilter === day;
+    html += `<div class="day-pill ${isActive ? 'active' : ''}" onclick="setDayFilter('${day}')">
       <span class="pill-day">${day}</span>
       <span class="pill-date">${date.getDate()} ${months[date.getMonth()]}</span>
     </div>`;
@@ -3245,7 +3129,10 @@ function setDayFilter(key) {
 
   // Also update right panel to show the selected day's routes
   if (key !== 'ALL') {
-    state.activeRightDay = key;
+    // Find the matching schedule key (e.g. MON → MON-W1 or MON-W2)
+    const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+    const match = allDays.find(d => d.day === key);
+    if (match) state.activeRightDay = match.key;
   }
 
   renderDayPills();
