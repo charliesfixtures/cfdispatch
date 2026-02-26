@@ -300,7 +300,7 @@ body {
 
 .qc-title { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.55); margin-bottom: 6px; line-height: 1.25; padding-right: 38px; font-family: 'Inter Tight', sans-serif; }
 
-.qc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0 0; }
+.qc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0 0; align-items: center; }
 
 .qc-tag {
   font-size: 9px;
@@ -999,6 +999,7 @@ body {
   color: rgba(100,80,180,0.7);
   border: 1px solid rgba(120,100,220,0.15);
   cursor: pointer;
+  margin-left: auto;
 }
 .rider-tag:hover {
   background: rgba(120,100,220,0.18);
@@ -1015,6 +1016,7 @@ body {
   color: rgba(0,0,0,0.3);
   cursor: pointer;
   letter-spacing: 0.03em;
+  margin-left: auto;
 }
 .rider-toggle:hover {
   background: rgba(120,100,220,0.08);
@@ -2482,6 +2484,13 @@ function buildQueueCard(card) {
     const recs = recommendMultiple(card, 3);
     const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
 
+    // Score → color: green (<5 = likely), gold (5-20 = possible), red (>20 = unlikely)
+    function algoColor(score) {
+      if (score < 5) return 'rgba(76,155,60,0.85)';   // green — high likelihood
+      if (score <= 20) return 'rgba(190,150,40,0.8)';  // gold — moderate
+      return 'rgba(200,85,60,0.8)';                     // red — low likelihood
+    }
+
     if (recs.length > 0 && recs[0].routesFull) {
       const dateStr = recs[0].nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       algoStrip = `<div class="algo-strip" style="background:rgba(180,130,40,0.06)">
@@ -2492,9 +2501,9 @@ function buildQueueCard(card) {
     } else if (recs.length > 0) {
       // Best recommendation
       const best = recs[0];
-      const wk = best.dayKey?.includes('W2') ? 'Wk2' : 'Wk1';
-      const prefLabel = best.isPreferredDay ? '<span style="color:rgba(110,160,50,0.8);font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
-      const emptyLabel = best.stopsOnTruck === 0 ? '<span style="color:rgba(110,160,50,0.6);font-size:9px;margin-left:3px">· open route</span>' : '';
+      const dateStr = best.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const color = algoColor(best.score);
+      const prefLabel = best.isPreferredDay ? '<span style="font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
       const riderMatch = (card.rider && best.isInRouteMatch) ? '<span style="color:rgba(100,80,180,0.8);font-size:9px;font-weight:700;margin-left:4px">🏷 IN-ROUTE</span>' : '';
 
       algoStrip = `<div class="algo-strip" 
@@ -2502,23 +2511,21 @@ function buildQueueCard(card) {
         onmouseleave="clearRoutePreview()"
         style="cursor:pointer">
         <span class="algo-icon">✦</span>
-        <span class="algo-label">${dayNames[best.day]} ${wk}</span>
-        <span class="algo-detail">· Truck ${best.truck} · Stop ${best.insertPos + 1}</span>
-        ${prefLabel}${emptyLabel}${riderMatch}
-        <span class="algo-dist">${best.minDist.toFixed(1)} mi</span>
+        <span style="color:${color};font-weight:700;font-size:11px;font-family:'Inter Tight',sans-serif">${dateStr}</span>
+        ${prefLabel}${riderMatch}
       </div>`;
 
       // Second recommendation (alternative)
       if (recs.length > 1 && !recs[1].routesFull) {
         const alt = recs[1];
-        const altWk = alt.dayKey?.includes('W2') ? 'Wk2' : 'Wk1';
+        const altDateStr = alt.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const altColor = algoColor(alt.score);
         const altPref = alt.isPreferredDay ? ' ★' : '';
         algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px;cursor:pointer"
           onmouseenter="showRoutePreview('${card.id}','${alt.dayKey}','${alt.truck}',${alt.insertPos})"
           onmouseleave="clearRoutePreview()">
           <span class="algo-icon" style="font-size:9px">○</span>
-          <span style="color:rgba(0,0,0,0.4);font-weight:500;font-size:10px;font-family:'Inter Tight',sans-serif">${dayNames[alt.day]} ${altWk} · Truck ${alt.truck} · Stop ${alt.insertPos + 1}${altPref}</span>
-          <span class="algo-dist">${alt.minDist.toFixed(1)} mi</span>
+          <span style="color:${altColor};font-weight:500;font-size:10px;font-family:'Inter Tight',sans-serif">${altDateStr}${altPref}</span>
         </div>`;
       }
     } else {
