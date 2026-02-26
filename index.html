@@ -1255,35 +1255,40 @@ body {
 }
 
 .brand-logo {
-  height: 38px;
+  height: 30px;
   display: block;
-  filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35));
-  opacity: 0.92;
+  opacity: 0.5;
+  filter: brightness(0.45);
 }
 
 .brand-byline {
   font-family: 'Inter Tight', sans-serif;
-  font-size: 10px;
-  color: rgba(0,0,0,0.32);
-  letter-spacing: 0.06em;
-  margin-left: 2px;
+  font-size: 8.5px;
+  color: rgba(0,0,0,0.22);
+  letter-spacing: 0.04em;
 }
 
 .brand-sync {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-left: 2px;
+  gap: 4px;
 }
 
 .brand-sync span {
   font-size: 9px;
-  color: rgba(0,0,0,0.22);
+  color: rgba(0,0,0,0.18);
   font-family: 'Inter Tight', sans-serif;
   letter-spacing: 0.02em;
 }
 
-.brand-logo { height: 28px; display: block; }
+.brand-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1px;
+  margin-left: 2px;
+}
+
 .brand-sep { width: 1px; height: 16px; background: rgba(0,0,0,0.1); }
 
 /* ── SUGGESTION BANNER ── */
@@ -2167,7 +2172,19 @@ function recommendMultiple(card, limit = 5) {
     }
   }
 
-  return options.slice(0, limit);
+  // Deduplicate by date — show best option per unique day
+  const seenDays = new Set();
+  const uniqueDateOptions = [];
+  for (const opt of options) {
+    const dateKey = opt.date.toDateString();
+    if (!seenDays.has(dateKey)) {
+      seenDays.add(dateKey);
+      uniqueDateOptions.push(opt);
+    }
+    if (uniqueDateOptions.length >= limit) break;
+  }
+
+  return uniqueDateOptions;
 }
 
 // ════════════════════════════════════════════════════════
@@ -4193,18 +4210,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- BRAND FLOAT -->
 <div class="brand-float">
-  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
+  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;">
     <img src="assets/dispatch-logo-new.png" class="brand-logo" alt="Dispatch" />
-    <span class="brand-byline">by: will.powah</span>
-    <div class="brand-sync">
-      <div class="sync-dot" id="sync-dot"></div>
-      <span id="sync-label">Connecting...</span>
-    </div>
+    <span class="brand-byline" style="align-self:flex-end;">by: will.powah</span>
   </div>
 </div>
 
 <!-- ACTION BUTTONS -->
 <div class="action-float">
+  <div class="sync-indicator" style="display:flex;align-items:center;gap:4px;margin-right:4px;">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-label" style="font-size:9px;color:rgba(0,0,0,0.22);font-family:'Inter Tight',sans-serif;white-space:nowrap;">Connecting...</span>
+  </div>
   <button class="btn-icon" onclick="refreshData()" title="Refresh">↻</button>
   <button class="btn-icon" onclick="openSettings()" title="Settings">⚙</button>
 </div>
