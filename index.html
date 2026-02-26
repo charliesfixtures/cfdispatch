@@ -2394,6 +2394,22 @@ function renderQueue() {
   const badge = document.getElementById('queue-badge');
   const search = document.getElementById('queue-search').value.toLowerCase();
 
+  // Sort queue: RS date ascending (earliest requested first), then card creation date (oldest first)
+  state.queueCards.sort((a, b) => {
+    const rsA = parseRS(a.rsValue);
+    const rsB = parseRS(b.rsValue);
+    
+    // Cards with specific dates go first, sorted by date ascending
+    const dateA = rsA.type === 'date' ? rsA.date.getTime() : Infinity;
+    const dateB = rsB.type === 'date' ? rsB.date.getTime() : Infinity;
+    if (dateA !== dateB) return dateA - dateB;
+    
+    // Then by Trello card creation (embedded in card ID — first 8 hex chars)
+    const createdA = parseInt(a.id?.substring(0, 8), 16) || 0;
+    const createdB = parseInt(b.id?.substring(0, 8), 16) || 0;
+    return createdA - createdB;
+  });
+
   const filtered = state.queueCards.filter(c =>
     c.name.toLowerCase().includes(search) ||
     (c.address || '').toLowerCase().includes(search)
@@ -3342,7 +3358,11 @@ function dropStop(e, dayKey, truck, toIdx) {
 
   const fromLabel = fromTruck.replace('truck','Truck ').toUpperCase().replace('TRUCK ','Truck ');
   const toLabel = truck.replace('truck','Truck ').toUpperCase().replace('TRUCK ','Truck ');
-  showToast(`↔ Moved to ${toLabel}, Stop ${toIdx + 1}`, 'info');
+  if (moved.committed) {
+    showToast(`⚠ Committed stop moved to ${toLabel} — Trello may need updating`, 'warning');
+  } else {
+    showToast(`↔ Moved to ${toLabel}, Stop ${toIdx + 1}`, 'info');
+  }
 }
 
 // ── DRAG STOP BACK TO QUEUE (UN-SCHEDULE) ──
