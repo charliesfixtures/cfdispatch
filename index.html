@@ -946,6 +946,64 @@ body {
   color: rgba(100,70,0,0.6);
 }
 
+/* Staged timestamp row */
+.staged-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 0 36px;
+  font-size: 9.5px;
+  font-family: 'Inter Tight', sans-serif;
+  color: rgba(160,120,0,0.4);
+  letter-spacing: 0.01em;
+}
+.staged-meta .staged-by {
+  font-weight: 600;
+  color: rgba(160,120,0,0.5);
+}
+.staged-meta .staged-time {
+  font-weight: 400;
+}
+
+/* Rider tag on queue cards */
+.rider-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: 'Inter Tight', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(120,100,220,0.1);
+  color: rgba(100,80,180,0.7);
+  border: 1px solid rgba(120,100,220,0.15);
+  cursor: pointer;
+}
+.rider-tag:hover {
+  background: rgba(120,100,220,0.18);
+}
+
+/* Rider toggle button in card */
+.rider-toggle {
+  font-size: 9px;
+  font-family: 'Inter Tight', sans-serif;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px dashed rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.02);
+  color: rgba(0,0,0,0.3);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+}
+.rider-toggle:hover {
+  background: rgba(120,100,220,0.08);
+  border-color: rgba(120,100,220,0.2);
+  color: rgba(100,80,180,0.6);
+}
+
 /* ── COMMITTED STOP ── */
 .stop-item.committed {
   border-left: 3px solid var(--success);
@@ -2045,12 +2103,21 @@ function recommendMultiple(card, limit = 5) {
       const capacityBonus = (MAX_STOPS - stops.length) * 2;
       score -= capacityBonus;
 
+      // Rider bonus: if card is flagged as rider and truck has stops, 
+      // give a big bonus when the card is close to an existing stop (in-route match)
+      let isInRouteMatch = false;
+      if (card.rider && stops.length > 0 && minDist < 5) {
+        score -= 200; // Strong bonus for nearby route match
+        isInRouteMatch = true;
+      }
+
       const insertPos = bestInsertPosition(stops, card.coords);
 
       options.push({
         dayKey: key, day, date, truck, insertPos, minDist,
         overflow: stops.length >= MAX_STOPS,
         isPreferredDay: !!isPreferredDay,
+        isInRouteMatch,
         stopsOnTruck: stops.length,
         score
       });
@@ -2393,6 +2460,7 @@ function buildQueueCard(card) {
       const wk = best.dayKey?.includes('W2') ? 'Wk2' : 'Wk1';
       const prefLabel = best.isPreferredDay ? '<span style="color:rgba(110,160,50,0.8);font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
       const emptyLabel = best.stopsOnTruck === 0 ? '<span style="color:rgba(110,160,50,0.6);font-size:9px;margin-left:3px">· open route</span>' : '';
+      const riderMatch = (card.rider && best.isInRouteMatch) ? '<span style="color:rgba(100,80,180,0.8);font-size:9px;font-weight:700;margin-left:4px">🏷 IN-ROUTE</span>' : '';
 
       algoStrip = `<div class="algo-strip" 
         onmouseenter="showRoutePreview('${card.id}','${best.dayKey}','${best.truck}',${best.insertPos})"
@@ -2401,7 +2469,7 @@ function buildQueueCard(card) {
         <span class="algo-icon">✦</span>
         <span class="algo-label">${dayNames[best.day]} ${wk}</span>
         <span class="algo-detail">· Truck ${best.truck} · Stop ${best.insertPos + 1}</span>
-        ${prefLabel}${emptyLabel}
+        ${prefLabel}${emptyLabel}${riderMatch}
         <span class="algo-dist">${best.minDist.toFixed(1)} mi</span>
       </div>`;
 
@@ -2470,6 +2538,8 @@ function buildQueueCard(card) {
     <div class="qc-flags">
       ${quadrant ? `<span class="qc-tag">${quadrant}</span>` : ''}
       <span class="qc-tag">${rsDisplay}</span>
+      ${card.rider ? `<span class="rider-tag" onclick="event.stopPropagation();toggleRider('${card.id}')" title="Click to remove rider flag">🏷 RIDER</span>` 
+        : `<span class="rider-toggle" onclick="event.stopPropagation();toggleRider('${card.id}')" title="Mark as rider — waiting for an in-route match">rider</span>`}
     </div>
     ${algoStrip}
     ${expandedHtml}
@@ -2585,8 +2655,9 @@ function renderRouteSheet() {
             ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
             ${isCommitted ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif">✓</span>' : ''}
             <button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit">✎</button>
-            <button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Remove">✕</button>
+            ${isCommitted ? `<button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Remove (will undo Trello)">✕</button>` : ''}
           </div>
+          ${isStaged && stop.stagedAt ? `<div class="staged-meta"><span class="staged-by">${stop.stagedBy || ''}</span><span class="staged-time">Staged ${new Date(stop.stagedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span></div>` : ''}
         </div>`;
       });
 
@@ -2636,6 +2707,18 @@ function selectCard(cardId) {
       dot.classList.remove('selected');
     }
   });
+}
+
+function toggleRider(cardId) {
+  const card = state.queueCards.find(c => c.id === cardId);
+  if (!card) return;
+  card.rider = !card.rider;
+  renderQueue();
+  if (card.rider) {
+    showToast(`🏷 ${card.name.split(' ').slice(0,3).join(' ')}… flagged as rider — waiting for in-route match`, 'info');
+  } else {
+    showToast(`Rider flag removed`, 'info');
+  }
 }
 
 function toggleExpandCard(cardId) {
@@ -2847,6 +2930,8 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     dropoff: card.dropoff,
     deliveryNotes: card.deliveryNotes,
     committed: false,
+    stagedAt: Date.now(),
+    stagedBy: state.currentUser || '',
   };
 
   // Insert into schedule
@@ -3130,27 +3215,53 @@ function permutations(arr) {
 }
 
 function removeStop(dayKey, truck, idx) {
+  const stop = state.schedule[dayKey]?.[truck]?.[idx];
+  if (!stop) return;
+
+  // Staged (uncommitted) — instant removal, no dialog
+  if (!stop.committed) {
+    state.schedule[dayKey][truck].splice(idx, 1);
+    state.queueCards.unshift({
+      id: stop.cardId || stop.id,
+      shortLink: stop.shortLink,
+      name: stop.cardName || stop.name,
+      address: stop.address,
+      coords: stop.coords,
+      quadrant: stop.quadrant,
+      invTotal: stop.invTotal,
+      customerName: stop.customerName,
+      customerPhone: stop.customerPhone,
+      firstStopRequested: stop.firstStopRequested,
+      whiteGlove: stop.whiteGlove,
+      equipRemoval: stop.equipRemoval,
+      stairs: stop.stairs,
+      dropoff: stop.dropoff,
+      deliveryNotes: stop.deliveryNotes,
+      rider: stop.rider,
+    });
+    renderQueue();
+    renderRightPanel();
+    renderMap();
+    showToast(`↩ ${(stop.cardName || stop.name).split(' ').slice(0,3).join(' ')}… returned to queue`, 'info');
+    return;
+  }
+
+  // Committed — confirm dialog, undo Trello changes
   showConfirm(
     '🗑️',
-    'Remove from schedule?',
-    'This will unschedule the stop, clear the due date and OT field in Trello, and return the card to the queue.',
+    'Un-commit from schedule?',
+    'This will undo the Trello changes (clear due date, OT field) and return the card to the queue.',
     async () => {
-      const stop = state.schedule[dayKey]?.[truck]?.[idx];
-      if (!stop) return;
-
       try {
-        // Unschedule in Trello
         await trello(`/cards/${stop.id}`, 'PUT', { due: null });
         await trello(`/cards/${stop.id}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
         await trello(`/cards/${stop.id}/actions/comments`, 'POST', { text: '🔄 Removed from schedule via CF Dispatch' });
 
         state.schedule[dayKey][truck].splice(idx, 1);
         reoptimizeTruck(dayKey, truck);
+        state.queueCards.unshift({ ...stop, committed: false });
 
-        // Return to queue
-        state.queueCards.unshift({ ...stop });
-
-        showToast(`${stop.cardName} returned to queue`, 'info');
+        showToast(`${stop.cardName || stop.name} un-committed and returned to queue`, 'info');
         renderQueue();
         renderRightPanel();
         renderMap();
