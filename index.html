@@ -1257,6 +1257,7 @@ body {
   display: block;
   filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35));
   opacity: 0.92;
+  mix-blend-mode: screen;
 }
 
 .brand-byline {
@@ -1281,7 +1282,7 @@ body {
   letter-spacing: 0.02em;
 }
 
-.brand-logo { height: 22px; display: block; }
+.brand-logo { height: 28px; display: block; mix-blend-mode: screen; }
 .brand-sep { width: 1px; height: 16px; background: rgba(0,0,0,0.1); }
 
 /* ── SUGGESTION BANNER ── */
@@ -4060,6 +4061,19 @@ function setDayFilter(key) {
   // Also update right panel to show the selected day's routes
   if (key !== 'ALL') {
     state.activeRightDay = key;
+  } else {
+    // ALL selected — show today's date (or nearest working day)
+    const now = new Date();
+    const todayName = ['SUN','MON','TUE','WED','THU','FRI','SAT'][now.getDay()];
+    const allDates = [...getWeekDates(0), ...getWeekDates(1)];
+    const today = allDates.find(d => {
+      const s = d.date;
+      return s.getFullYear() === now.getFullYear() && s.getMonth() === now.getMonth() && s.getDate() === now.getDate();
+    });
+    if (today) {
+      state.activeRightDay = today.key;
+    }
+    // If today isn't in the 10-day window, keep current activeRightDay
   }
 
   renderDayPills();
@@ -4174,7 +4188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- BRAND FLOAT -->
 <div class="brand-float">
   <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
-    <img src="assets/dispatch-logo.png" class="brand-logo" alt="Dispatch" />
+    <img src="assets/dispatch-logo-new.png" class="brand-logo" alt="Dispatch" />
     <span class="brand-byline">by: will.powah</span>
     <div class="brand-sync">
       <div class="sync-dot" id="sync-dot"></div>
