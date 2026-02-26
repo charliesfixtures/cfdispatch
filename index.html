@@ -799,6 +799,7 @@ body {
 }
 
 .stop-item:hover .stop-actions { opacity: 1; }
+.stop-item.staged .stop-actions { opacity: 1; }
 
 .stop-btn {
   width: 22px; height: 22px;
@@ -859,6 +860,80 @@ body {
 
 .commit-btn:hover { background: #f5d660; }
 .commit-btn:disabled { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.2); cursor: not-allowed; }
+
+/* ── DROP ZONE ── */
+.truck-section.drop-hover {
+  border-color: rgba(240,201,58,0.6);
+  background: rgba(240,201,58,0.06);
+  box-shadow: 0 0 0 2px rgba(240,201,58,0.2), 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+.truck-section.drop-reject {
+  border-color: rgba(224,122,95,0.4);
+  background: rgba(224,122,95,0.04);
+}
+
+.drop-insert-line {
+  height: 2px;
+  background: var(--accent);
+  margin: 0 12px;
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  box-shadow: 0 0 8px rgba(240,201,58,0.4);
+}
+
+.drop-insert-line.visible {
+  opacity: 1;
+}
+
+/* ── STAGED STOP (dragged but not committed) ── */
+.stop-item.staged {
+  border: 1.5px dashed rgba(240,201,58,0.5);
+  border-radius: 8px;
+  margin: 4px 6px;
+  padding: 8px 10px;
+  background: rgba(240,201,58,0.04);
+}
+
+.stop-item.staged .stop-num {
+  background: rgba(240,201,58,0.12);
+  border-color: rgba(240,201,58,0.3);
+  color: rgba(160,120,0,0.7);
+}
+
+/* Per-card commit button inside staged stop */
+.stop-commit-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: #000;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.stop-commit-btn:hover {
+  background: #f5d660;
+  box-shadow: 0 2px 8px rgba(240,201,58,0.3);
+}
+
+/* ── COMMITTED STOP ── */
+.stop-item.committed {
+  border-left: 3px solid var(--success);
+  background: rgba(110,207,150,0.04);
+}
+
+.stop-item.committed .stop-num {
+  background: rgba(110,207,150,0.12);
+  border-color: rgba(110,207,150,0.3);
+  color: rgba(40,120,70,0.7);
+}
 
 /* ── DRIVER PICKER ── */
 .driver-picker {
@@ -1513,10 +1588,6 @@ body {
     <div class="truck-c-wrap" id="truck-c-wrap">
       <button class="truck-c-btn" id="truck-b-btn" onclick="toggleTruckB()">+ Add Truck B</button>
       <button class="truck-c-btn" id="truck-c-btn" onclick="toggleTruckC()" style="display:none">+ Add Truck C</button>
-    </div>
-    <div class="commit-wrap" style="display:flex;flex-direction:column;gap:6px;padding:0 0 6px;">
-      <button class="commit-btn" id="commit-day-btn" onclick="commitDay()">Commit Day to Trello</button>
-      <button class="commit-btn" id="commit-all-btn" style="display:none;background:rgba(240,201,58,0.15);color:var(--accent);border:1px solid rgba(240,201,58,0.3);" onclick="commitAll()">Commit All Pending</button>
     </div>
   </div>
 
@@ -2331,7 +2402,10 @@ function renderRouteSheet() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>`;
 
-    html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''}">
+    html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''}"
+      ondragover="handleTruckDragOver(event,'${key}','${truck}')"
+      ondragleave="handleTruckDragLeave(event,this)"
+      ondrop="handleTruckDrop(event,'${key}','${truck}')">
       <div class="truck-header">
         ${avatarHTML}
         <div class="truck-info">
@@ -2353,15 +2427,17 @@ function renderRouteSheet() {
         <div class="route-endpoint"><span class="endpoint-icon">🏭</span> Fruitland Warehouse</div>`;
 
       stops.forEach((stop, i) => {
+        const isStaged = !stop.committed;
+        const isCommitted = !!stop.committed;
         const flags = [
           stop.firstStopApproved && '<span class="stop-flag flag-first">1st</span>',
           stop.whiteGlove && '<span class="stop-flag flag-wg">WG</span>',
           stop.equipRemoval && '<span class="stop-flag flag-remove">RM</span>',
         ].filter(Boolean).join('');
 
-        html += `<div class="stop-item" draggable="true"
+        html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
-          ondragover="event.preventDefault();this.style.background='rgba(0,0,0,0.04)'"
+          ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
           ondrop="dropStop(event,'${key}','${truck}',${i});this.style.background=''">
           <div class="stop-num" title="Drag to reorder">⠿ ${i+1}</div>
@@ -2373,6 +2449,8 @@ function renderRouteSheet() {
             </div>
           </div>
           <div class="stop-actions">
+            ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
+            ${isCommitted ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif">✓</span>' : ''}
             <button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit">✎</button>
             <button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Remove">✕</button>
           </div>
@@ -2463,7 +2541,201 @@ function dragQueueCard(e, cardId) {
 
 function endDragQueueCard(e) {
   e.target.classList.remove('dragging');
+  // Clean up any lingering drop-hover states
+  document.querySelectorAll('.truck-section.drop-hover').forEach(el => el.classList.remove('drop-hover'));
   state._draggingCardId = null;
+}
+
+// ── DROP ZONE HANDLERS ──
+function handleTruckDragOver(e, dayKey, truck) {
+  e.preventDefault();
+  const cardId = state._draggingCardId;
+  if (!cardId) return; // not dragging a queue card
+
+  const card = state.queueCards.find(c => c.id === cardId);
+  const truckKey = `${dayKey}-${truck}`;
+  const section = e.currentTarget;
+
+  // Reject: no coords
+  if (!card?.coords) {
+    section.classList.add('drop-reject');
+    section.classList.remove('drop-hover');
+    e.dataTransfer.dropEffect = 'none';
+    return;
+  }
+
+  // Reject: locked truck
+  if (state.lockedTrucks[truckKey]) {
+    section.classList.add('drop-reject');
+    section.classList.remove('drop-hover');
+    e.dataTransfer.dropEffect = 'none';
+    return;
+  }
+
+  // Accept
+  section.classList.add('drop-hover');
+  section.classList.remove('drop-reject');
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleTruckDragLeave(e, el) {
+  // Only remove if leaving the truck-section (not entering a child)
+  if (!el.contains(e.relatedTarget)) {
+    el.classList.remove('drop-hover');
+    el.classList.remove('drop-reject');
+  }
+}
+
+function handleTruckDrop(e, dayKey, truck) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const section = e.currentTarget;
+  section.classList.remove('drop-hover');
+  section.classList.remove('drop-reject');
+
+  const cardId = e.dataTransfer.getData('text/plain');
+  if (!cardId) return;
+
+  const card = state.queueCards.find(c => c.id === cardId);
+  if (!card) return;
+
+  const truckKey = `${dayKey}-${truck}`;
+
+  // Reject: no address
+  if (!card.coords) {
+    showToast('⚠ Address required — cannot schedule this card', 'error');
+    return;
+  }
+
+  // Reject: locked
+  if (state.lockedTrucks[truckKey]) {
+    showToast('🔒 Truck is locked — unlock to add stops', 'error');
+    return;
+  }
+
+  // Reject: full (4 stops) and not within overflow radius
+  const stops = state.schedule[dayKey]?.[truck] || [];
+  if (stops.length >= MAX_STOPS) {
+    const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
+    if (minDist > OVERFLOW_RADIUS_MILES) {
+      showToast(`Truck ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
+      return;
+    }
+  }
+
+  // Find best insert position using algo
+  const insertPos = bestInsertPosition(stops, card.coords);
+
+  // Build stop object from card (staged, not committed)
+  const newStop = {
+    id: card.id,
+    cardId: card.id,
+    shortLink: card.shortLink,
+    name: card.name,
+    cardName: card.name,
+    address: card.address,
+    coords: card.coords,
+    quadrant: card.quadrant,
+    invTotal: card.invTotal,
+    customerName: card.customerName,
+    customerPhone: card.customerPhone,
+    firstStopRequested: card.firstStopRequested,
+    firstStopApproved: card.firstStopRequested, // auto-approve if requested
+    whiteGlove: card.whiteGlove,
+    equipRemoval: card.equipRemoval,
+    stairs: card.stairs,
+    dropoff: card.dropoff,
+    deliveryNotes: card.deliveryNotes,
+    committed: false, // STAGED — not yet committed to Trello
+  };
+
+  // Insert into schedule
+  if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
+  if (!state.schedule[dayKey][truck]) state.schedule[dayKey][truck] = [];
+  state.schedule[dayKey][truck].splice(insertPos, 0, newStop);
+
+  // Remove from pending queue
+  state.queueCards = state.queueCards.filter(c => c.id !== cardId);
+
+  // Re-render everything
+  renderQueue();
+  renderRightPanel();
+  renderMap();
+
+  showToast(`📦 ${card.name.split(' ').slice(0,3).join(' ')}… → Truck ${truck}, Stop ${insertPos + 1}`, 'info');
+}
+
+// ── PER-CARD COMMIT TO TRELLO ──
+async function commitSingleCard(dayKey, truck, stopIndex) {
+  const stops = state.schedule[dayKey]?.[truck];
+  if (!stops || !stops[stopIndex]) return;
+
+  const stop = stops[stopIndex];
+  if (stop.committed) {
+    showToast('Already committed', 'info');
+    return;
+  }
+
+  // Determine scheduled date
+  const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+  const dayInfo = allDays.find(d => d.key === dayKey);
+  if (!dayInfo) { showToast('Could not determine date', 'error'); return; }
+
+  // Due date = scheduled day at 5:00 PM Pacific
+  const dueDate = new Date(dayInfo.date);
+  const isDST = dueDate.getMonth() >= 2 && dueDate.getMonth() <= 10; // rough DST
+  dueDate.setHours(17, 0, 0, 0);
+  const offset = isDST ? 7 : 8; // PDT = UTC-7, PST = UTC-8
+  const utcDue = new Date(dueDate.getTime() + offset * 3600000);
+
+  try {
+    showToast('Committing to Trello…', 'info');
+
+    // 1. Set due date
+    await trello(`/cards/${stop.cardId}`, 'PUT', { due: utcDue.toISOString() });
+
+    // 2. Set OT custom field to true
+    const otField = state.customFields?.find(f => f.name === 'OT');
+    if (otField) {
+      await trello(`/cards/${stop.cardId}/customField/${otField.id}/item`, 'PUT', {
+        value: { checked: 'true' }
+      });
+    }
+
+    // 3. Add comment with scheduling info
+    const comment = `📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Truck ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n📍 Via CF Dispatch`;
+    await trello(`/cards/${stop.cardId}/actions/comments`, 'POST', { text: comment });
+
+    // 4. Move card to salesperson's shipper list
+    // Find the card owner's shipper list (e.g., "Shipper - William")
+    if (stop.cardId) {
+      const cardData = await trello(`/cards/${stop.cardId}?fields=idMembers`);
+      if (cardData.idMembers?.length > 0) {
+        const memberId = cardData.idMembers[0];
+        const member = await trello(`/members/${memberId}?fields=fullName`);
+        const firstName = member.fullName?.split(' ')[0] || '';
+        if (firstName) {
+          const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
+          const shipperList = lists.find(l => l.name.toLowerCase().includes('shipper') && l.name.toLowerCase().includes(firstName.toLowerCase()));
+          if (shipperList) {
+            await trello(`/cards/${stop.cardId}`, 'PUT', { idList: shipperList.id });
+          }
+        }
+      }
+    }
+
+    // Mark as committed in local state
+    stop.committed = true;
+
+    renderRightPanel();
+    renderMap();
+    showToast(`✅ ${stop.cardName || stop.name} committed!`, 'success');
+
+  } catch (err) {
+    console.error('Commit failed:', err);
+    showToast('❌ Commit failed — check console', 'error');
+  }
 }
 
 function scheduleCard(cardId) {
