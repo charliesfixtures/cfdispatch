@@ -184,7 +184,7 @@ body {
   backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
   -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
   border: 1px solid rgba(255,255,255,0.35);
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: var(--radius);
   padding: 12px 14px 10px;
   flex-shrink: 0;
   box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
@@ -249,16 +249,11 @@ body {
 .cards-list {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   overflow-y: auto;
-  max-height: calc(100vh - 180px);
-  padding: 6px;
-  background: rgba(200,195,185,0.5);
-  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
-  border: 1px solid rgba(255,255,255,0.35);
-  border-top: none;
-  border-radius: 0 0 var(--radius) var(--radius);
+  max-height: calc(100vh - 140px);
+  padding: 6px 0;
+  background: transparent;
 }
 
 .cards-list::-webkit-scrollbar { width: 4px; }
@@ -267,15 +262,16 @@ body {
 
 /\* Queue card \*/
 .queue-card {
-  background: var(--card-bg);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  border: 1px solid var(--card-border);
+  background: rgba(200,195,185,0.5);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+  border: 1px solid rgba(255,255,255,0.35);
   border-radius: var(--radius);
-  padding: 14px 16px;
+  padding: 16px 18px;
   cursor: grab;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   position: relative;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
 }
 
 .queue-card:hover {
@@ -296,14 +292,15 @@ body {
   background: rgba(170,165,155,0.45);
 }
 
-.queue-card.has-warning { border-left: 3px solid rgba(200,100,50,0.3); }
-.queue-card.has-warning-soft { border-left: 3px solid rgba(200,160,50,0.25); }
+/* Warning border removed — amber algo strip text is sufficient cue */
+.queue-card.has-warning { }
+.queue-card.has-warning-soft { }
 
 .queue-card.dragging { opacity: 0.4; transform: rotate(1deg); }
 
-.qc-title { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.55); margin-bottom: 5px; line-height: 1.25; padding-right: 38px; font-family: 'Inter Tight', sans-serif; }
+.qc-title { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.55); margin-bottom: 6px; line-height: 1.25; padding-right: 38px; font-family: 'Inter Tight', sans-serif; }
 
-.qc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.qc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0 0; }
 
 .qc-tag {
   font-size: 9px;
