@@ -1024,6 +1024,48 @@ body {
   color: rgba(100,80,180,0.6);
 }
 
+/* Free delivery toggle (inside expanded view) */
+.free-toggle {
+  font-size: 9px;
+  font-family: 'Inter Tight', sans-serif;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px dashed rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.02);
+  color: rgba(0,0,0,0.3);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: all 0.15s;
+}
+.free-toggle:hover {
+  background: rgba(120,100,220,0.08);
+  border-color: rgba(120,100,220,0.2);
+  color: rgba(100,80,180,0.6);
+}
+.free-toggle.active {
+  background: rgba(120,100,220,0.12);
+  border: 1px solid rgba(120,100,220,0.25);
+  color: rgba(100,80,180,0.8);
+  font-weight: 600;
+}
+
+/* FREE micro-badge inline with card title */
+.free-badge {
+  font-size: 7px;
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(120,100,220,0.12);
+  color: rgba(100,80,180,0.7);
+  border: 1px solid rgba(120,100,220,0.15);
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 /* ── COMMITTED STOP ── */
 .stop-item.committed {
   border-left: 3px solid var(--success);
@@ -2591,8 +2633,15 @@ function buildQueueCard(card) {
       ${card.invTotal ? `<div class="qc-expanded-row"><span class="exp-icon">💰</span> $${parseFloat(card.invTotal).toLocaleString()}</div>` : ''}
       ${serviceTags.length ? `<div class="qc-expanded-tags">${serviceTags.map(t => `<span class="exp-tag">${t}</span>`).join('')}</div>` : ''}
       ${card.deliveryNotes ? `<div class="qc-expanded-divider"></div><div class="qc-expanded-row" style="font-style:italic;opacity:0.7"><span class="exp-icon">💬</span> ${card.deliveryNotes}</div>` : ''}
+      <div class="qc-expanded-divider"></div>
+      <div class="qc-expanded-row" style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:10px;color:rgba(0,0,0,0.4)">Free delivery (ride-along)</span>
+        <span class="free-toggle ${card.rider ? 'active' : ''}" onclick="event.stopPropagation();toggleRider('${card.id}')">${card.rider ? '✓ FREE' : 'Mark free'}</span>
+      </div>
     </div>`;
   }
+
+  const freeBadge = card.rider ? '<span class="free-badge">FREE</span>' : '';
 
   return `<div class="queue-card ${warningClass} ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}"
     draggable="true"
@@ -2601,12 +2650,10 @@ function buildQueueCard(card) {
     ondragstart="dragQueueCard(event,'${card.id}')"
     ondragend="endDragQueueCard(event)">
     ${avatarHtml}
-    <div class="qc-title">${card.name}</div>
+    <div class="qc-title" style="display:flex;align-items:center;gap:6px"><span>${card.name}</span>${freeBadge}</div>
     <div class="qc-flags">
       ${quadrant ? `<span class="qc-tag">${quadrant}</span>` : ''}
       <span class="qc-tag">${rsDisplay}</span>
-      ${card.rider ? `<span class="rider-tag" onclick="event.stopPropagation();toggleRider('${card.id}')" title="Click to remove rider flag">🏷 RIDER</span>` 
-        : `<span class="rider-toggle" onclick="event.stopPropagation();toggleRider('${card.id}')" title="Mark as rider — waiting for an in-route match">rider</span>`}
     </div>
     ${algoStrip}
     ${expandedHtml}
