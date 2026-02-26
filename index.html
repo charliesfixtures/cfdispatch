@@ -2070,7 +2070,7 @@ function recommendMultiple(card, limit = 5) {
 
   for (const { day, date, key } of allDays) {
     const todayDate = new Date(); todayDate.setHours(0,0,0,0);
-    if (date < todayDate) continue;
+    if (date <= todayDate) continue; // Skip today and past — earliest recommendation is tomorrow
 
     const isPreferredDay = preferredDate && (() => {
       const pDate = new Date(preferredDate); pDate.setHours(0,0,0,0);
@@ -2113,6 +2113,10 @@ function recommendMultiple(card, limit = 5) {
       // Score: lower is better
       let score = minDist + (directionPenalty * 0.1);
 
+      // colorScore: operational likelihood only (no RS preference bias)
+      // Used for green/gold/red display — reflects slot quality, not date preference
+      let colorScore = minDist + (directionPenalty * 0.1);
+
       // Preferred date bonus: massive score reduction if this is the requested day
       if (isPreferredDay) {
         score -= 1000; // Strongly prefer the requested date
@@ -2127,6 +2131,10 @@ function recommendMultiple(card, limit = 5) {
       // Capacity bonus: emptier routes score better (higher chance of approval)
       const capacityBonus = (MAX_STOPS - stops.length) * 2;
       score -= capacityBonus;
+      colorScore -= capacityBonus;
+
+      // Empty route = guaranteed green — no roadblocks
+      if (stops.length === 0) colorScore = -10;
 
       // Rider bonus: if card is flagged as rider and truck has stops, 
       // give a big bonus when the card is close to an existing stop (in-route match)
@@ -2144,7 +2152,8 @@ function recommendMultiple(card, limit = 5) {
         isPreferredDay: !!isPreferredDay,
         isInRouteMatch,
         stopsOnTruck: stops.length,
-        score
+        score,
+        colorScore
       });
     }
   }
@@ -2518,7 +2527,7 @@ function buildQueueCard(card) {
       // Best recommendation
       const best = recs[0];
       const dateStr = best.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const color = algoColor(best.score);
+      const color = algoColor(best.colorScore);
       const prefLabel = best.isPreferredDay ? '<span style="font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
       const riderMatch = (card.rider && best.isInRouteMatch) ? '<span style="color:rgba(100,80,180,0.8);font-size:9px;font-weight:700;margin-left:4px">🏷 IN-ROUTE</span>' : '';
 
@@ -2535,7 +2544,7 @@ function buildQueueCard(card) {
       if (recs.length > 1 && !recs[1].routesFull) {
         const alt = recs[1];
         const altDateStr = alt.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        const altColor = algoColor(alt.score);
+        const altColor = algoColor(alt.colorScore);
         const altPref = alt.isPreferredDay ? ' ★' : '';
         algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px;cursor:pointer"
           onmouseenter="showRoutePreview('${card.id}','${alt.dayKey}','${alt.truck}',${alt.insertPos})"
