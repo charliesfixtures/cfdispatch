@@ -889,26 +889,37 @@ body {
 
 /* ── STAGED STOP (dragged but not committed) ── */
 .stop-item.staged {
-  border: 1.5px dashed rgba(240,201,58,0.5);
-  border-radius: 8px;
+  border: 1.5px solid rgba(240,201,58,0.6);
+  border-radius: 10px;
   margin: 4px 6px;
-  padding: 8px 10px;
-  background: rgba(240,201,58,0.04);
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(240,201,58,0.18) 0%, rgba(240,201,58,0.08) 100%);
+  box-shadow: 0 2px 12px rgba(240,201,58,0.12), inset 0 1px 0 rgba(255,255,255,0.4);
 }
 
 .stop-item.staged .stop-num {
-  background: rgba(240,201,58,0.12);
-  border-color: rgba(240,201,58,0.3);
-  color: rgba(160,120,0,0.7);
+  background: rgba(240,201,58,0.35);
+  border-color: rgba(200,160,20,0.4);
+  color: rgba(100,70,0,0.85);
+  font-weight: 700;
 }
 
-/* Per-card commit button inside staged stop */
+.stop-item.staged .stop-name {
+  color: rgba(80,55,0,0.85);
+  font-weight: 700;
+}
+
+.stop-item.staged .stop-meta {
+  color: rgba(100,70,0,0.5);
+}
+
+/* Per-card commit button — gray on golden card */
 .stop-commit-btn {
   padding: 4px 10px;
   border-radius: 6px;
-  border: none;
-  background: var(--accent);
-  color: #000;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.55);
   font-family: 'Inter Tight', sans-serif;
   font-size: 10px;
   font-weight: 700;
@@ -919,8 +930,20 @@ body {
 }
 
 .stop-commit-btn:hover {
-  background: #f5d660;
-  box-shadow: 0 2px 8px rgba(240,201,58,0.3);
+  background: rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.8);
+  border-color: rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* Edit/remove buttons on staged — also muted */
+.stop-item.staged .stop-btn {
+  border-color: rgba(160,120,0,0.15);
+  color: rgba(120,85,0,0.3);
+}
+.stop-item.staged .stop-btn:hover {
+  background: rgba(160,120,0,0.08);
+  color: rgba(100,70,0,0.6);
 }
 
 /* ── COMMITTED STOP ── */
@@ -1942,7 +1965,12 @@ function getDriverStatus(driver) {
 // RECOMMENDATION ENGINE
 // ════════════════════════════════════════════════════════
 function recommend(card) {
-  if (!card.coords) return null;
+  const results = recommendMultiple(card, 1);
+  return results.length > 0 ? results[0] : null;
+}
+
+function recommendMultiple(card, limit = 5) {
+  if (!card.coords) return [];
 
   const week1 = getWeekDates(0);
   const week2 = getWeekDates(1);
@@ -1952,27 +1980,25 @@ function recommend(card) {
   let preferredDate = null;
   if (rsInfo.type === 'date') preferredDate = rsInfo.date;
 
-  let bestOption = null;
-  let bestScore = Infinity;
+  const options = [];
 
   for (const { day, date, key } of allDays) {
     const todayDate = new Date(); todayDate.setHours(0,0,0,0);
     if (date < todayDate) continue;
 
-    if (preferredDate) {
+    const isPreferredDay = preferredDate && (() => {
       const pDate = new Date(preferredDate); pDate.setHours(0,0,0,0);
       const dDate = new Date(date); dDate.setHours(0,0,0,0);
-      if (pDate.getTime() !== dDate.getTime()) continue;
-    }
+      return pDate.getTime() === dDate.getTime();
+    })();
 
     const trucksToShow = ['A', 'B', ...( (state.showTruckC || Object.keys(state.schedule[key]?.C || {}).length > 0 || (state.schedule[key]?.C || []).length > 0) ? ['C'] : [] )];
-  for (const truck of trucksToShow) {
+    for (const truck of trucksToShow) {
       const truckKey = `${key}-${truck}`;
       if (state.lockedTrucks[truckKey]) continue;
 
       const stops = state.schedule[key]?.[truck] || [];
       if (stops.length >= MAX_STOPS) {
-        // Check overflow
         const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
         if (minDist > OVERFLOW_RADIUS_MILES) continue;
       }
@@ -1998,18 +2024,41 @@ function recommend(card) {
         ? stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity)
         : distanceMiles(card.coords, FRUITLAND);
 
-      const score = minDist + (directionPenalty * 0.1) + (preferredDate ? 0 : (date - new Date()) / 86400000);
+      // Score: lower is better
+      let score = minDist + (directionPenalty * 0.1);
 
-      if (score < bestScore) {
-        bestScore = score;
-        const insertPos = bestInsertPosition(stops, card.coords);
-        bestOption = { dayKey: key, day, date, truck, insertPos, minDist, overflow: stops.length >= MAX_STOPS };
+      // Preferred date bonus: massive score reduction if this is the requested day
+      if (isPreferredDay) {
+        score -= 1000; // Strongly prefer the requested date
+      } else if (preferredDate) {
+        // If they have a preferred date but this isn't it, penalize heavily
+        score += 500;
+      } else {
+        // No preferred date — favor earlier days slightly
+        score += (date - new Date()) / 86400000 * 0.5;
       }
+
+      // Capacity bonus: emptier routes score better (higher chance of approval)
+      const capacityBonus = (MAX_STOPS - stops.length) * 2;
+      score -= capacityBonus;
+
+      const insertPos = bestInsertPosition(stops, card.coords);
+
+      options.push({
+        dayKey: key, day, date, truck, insertPos, minDist,
+        overflow: stops.length >= MAX_STOPS,
+        isPreferredDay: !!isPreferredDay,
+        stopsOnTruck: stops.length,
+        score
+      });
     }
   }
 
-  // If all 10 days are full, find next available working day beyond the window
-  if (!bestOption) {
+  // Sort by score (lower = better)
+  options.sort((a, b) => a.score - b.score);
+
+  // If no options and routes are full, add overflow fallback
+  if (options.length === 0) {
     const futureDays = allDays.filter(d => d.date >= new Date(new Date().setHours(0,0,0,0)));
     const lastDay = futureDays[futureDays.length - 1];
     if (lastDay) {
@@ -2019,15 +2068,16 @@ function recommend(card) {
         nextDate.setDate(nextDate.getDate() + 1);
       }
       const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-      bestOption = {
+      options.push({
         dayKey: null, day: dayNames[nextDate.getDay()], date: nextDate,
         truck: 'A', insertPos: 0, minDist: distanceMiles(card.coords, FRUITLAND),
-        overflow: false, routesFull: true, nextAvailableDate: nextDate
-      };
+        overflow: false, routesFull: true, nextAvailableDate: nextDate,
+        isPreferredDay: false, stopsOnTruck: 0, score: 9999
+      });
     }
   }
 
-  return bestOption;
+  return options.slice(0, limit);
 }
 
 // ════════════════════════════════════════════════════════
@@ -2259,7 +2309,7 @@ function buildQueueCard(card) {
   else if (rsInfo.type === 'past') rsDisplay = '⚠ Past date';
   else if (card.rsValue && card.rsValue !== '') rsDisplay = card.rsValue;
 
-  // Algo strip — graceful fail if no coords
+  // Algo strip — show top 2 recommendations with RS context
   let algoStrip = '';
   if (!card.coords) {
     algoStrip = `<div class="algo-strip" style="background:rgba(200,100,50,0.06)">
@@ -2267,24 +2317,42 @@ function buildQueueCard(card) {
       <span style="color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Address required for routing</span>
     </div>`;
   } else {
-    const rec = recommend(card);
-    if (rec && rec.routesFull) {
-      // Routes full — suggest next available day beyond the 10-day window
-      const dateStr = rec.nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const recs = recommendMultiple(card, 3);
+    const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
+
+    if (recs.length > 0 && recs[0].routesFull) {
+      const dateStr = recs[0].nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       algoStrip = `<div class="algo-strip" style="background:rgba(180,130,40,0.06)">
         <span class="algo-icon" style="opacity:0.7">⏳</span>
         <span style="color:rgba(160,110,30,0.65);font-weight:600;font-size:11px;font-family:'Inter Tight',sans-serif">Routes full</span>
         <span style="color:rgba(160,110,30,0.45);font-size:10.5px;font-family:'Inter Tight',sans-serif">· Next opening ${dateStr}</span>
       </div>`;
-    } else if (rec) {
-      const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
-      const wk = rec.dayKey.includes('W2') ? 'Wk2' : 'Wk1';
+    } else if (recs.length > 0) {
+      // Best recommendation
+      const best = recs[0];
+      const wk = best.dayKey?.includes('W2') ? 'Wk2' : 'Wk1';
+      const prefLabel = best.isPreferredDay ? '<span style="color:rgba(110,160,50,0.8);font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
+      const emptyLabel = best.stopsOnTruck === 0 ? '<span style="color:rgba(110,160,50,0.6);font-size:9px;margin-left:3px">· open route</span>' : '';
+
       algoStrip = `<div class="algo-strip">
         <span class="algo-icon">✦</span>
-        <span class="algo-label">${dayNames[rec.day]} ${wk}</span>
-        <span class="algo-detail">· Truck ${rec.truck} · Stop ${rec.insertPos + 1}</span>
-        <span class="algo-dist">${rec.minDist.toFixed(1)} mi</span>
+        <span class="algo-label">${dayNames[best.day]} ${wk}</span>
+        <span class="algo-detail">· Truck ${best.truck} · Stop ${best.insertPos + 1}</span>
+        ${prefLabel}${emptyLabel}
+        <span class="algo-dist">${best.minDist.toFixed(1)} mi</span>
       </div>`;
+
+      // Second recommendation (alternative)
+      if (recs.length > 1 && !recs[1].routesFull) {
+        const alt = recs[1];
+        const altWk = alt.dayKey?.includes('W2') ? 'Wk2' : 'Wk1';
+        const altPref = alt.isPreferredDay ? ' ★' : '';
+        algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px">
+          <span class="algo-icon" style="font-size:9px">○</span>
+          <span style="color:rgba(0,0,0,0.4);font-weight:500;font-size:10px;font-family:'Inter Tight',sans-serif">${dayNames[alt.day]} ${altWk} · Truck ${alt.truck} · Stop ${alt.insertPos + 1}${altPref}</span>
+          <span class="algo-dist">${alt.minDist.toFixed(1)} mi</span>
+        </div>`;
+      }
     } else {
       algoStrip = `<div class="algo-strip" style="background:rgba(0,0,0,0.02)">
         <span class="algo-icon" style="opacity:0.5">✦</span>
@@ -3257,6 +3325,17 @@ async function loadData() {
     }
 
     state.queueCards = processed;
+
+    // Remove cards that have been dragged into the schedule (staged or committed)
+    const scheduledCardIds = new Set();
+    for (const dayKey of Object.keys(state.schedule)) {
+      for (const truck of Object.keys(state.schedule[dayKey])) {
+        for (const stop of state.schedule[dayKey][truck]) {
+          if (stop.cardId) scheduledCardIds.add(stop.cardId);
+        }
+      }
+    }
+    state.queueCards = state.queueCards.filter(c => !scheduledCardIds.has(c.id));
 
     // Load already-scheduled cards (OT = true) for map display
     await loadScheduledCards();
