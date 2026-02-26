@@ -1570,7 +1570,10 @@ body {
         <input type="text" placeholder="Search cards..." id="queue-search" oninput="filterQueue()" />
       </div>
     </div>
-    <div class="cards-list" id="cards-list">
+    <div class="cards-list" id="cards-list"
+      ondragover="handleQueueDragOver(event)"
+      ondragleave="handleQueueDragLeave(event)"
+      ondrop="handleQueueDrop(event)">
       <div class="empty-state">
         <div class="icon">📭</div>
         <div class="title">No pending requests</div>
@@ -2128,7 +2131,64 @@ function createUnscheduledPin() {
 // ════════════════════════════════════════════════════════
 // RENDER MAP STOPS
 // ════════════════════════════════════════════════════════
+// ── ROUTE PREVIEW ON ALGO STRIP HOVER ──
+let previewLayer = null;
+let previewMarker = null;
+
+function showRoutePreview(cardId, dayKey, truck, insertPos) {
+  clearRoutePreview();
+
+  const card = state.queueCards.find(c => c.id === cardId);
+  if (!card?.coords) return;
+
+  // Get existing stops for this truck on this day
+  const existingStops = (state.schedule[dayKey]?.[truck] || []).filter(s => s.coords);
+  
+  // Build the route with this card inserted at the recommended position
+  const stopCoords = existingStops.map(s => s.coords);
+  stopCoords.splice(insertPos, 0, card.coords);
+
+  // Full route: Warehouse → stops → HQ
+  const routePoints = [FRUITLAND, ...stopCoords, HQ].map(p => [p.lat, p.lng]);
+
+  // Draw preview polyline — golden dashed, semi-transparent
+  previewLayer = L.polyline(routePoints, {
+    color: '#F0C93A',
+    weight: 4,
+    opacity: 0.7,
+    dashArray: '10 6',
+    smoothFactor: 2,
+  }).addTo(map);
+
+  // Pulsing marker at the card's position
+  const pulseHtml = `
+    <div style="position:relative;width:32px;height:32px">
+      <div style="position:absolute;inset:0;background:rgba(240,201,58,0.3);border-radius:50%;animation:pulse-ring 1.5s ease-out infinite"></div>
+      <div style="position:absolute;top:4px;left:4px;width:24px;height:24px;background:#F0C93A;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${insertPos + 1}</div>
+    </div>`;
+  
+  previewMarker = L.marker([card.coords.lat, card.coords.lng], {
+    icon: L.divIcon({ className: '', html: pulseHtml, iconSize: [32, 32], iconAnchor: [16, 16] }),
+    zIndexOffset: 1000
+  }).addTo(map);
+
+  // Add CSS animation if not already present
+  if (!document.getElementById('pulse-style')) {
+    const style = document.createElement('style');
+    style.id = 'pulse-style';
+    style.textContent = `@keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }`;
+    document.head.appendChild(style);
+  }
+}
+
+function clearRoutePreview() {
+  if (previewLayer) { previewLayer.remove(); previewLayer = null; }
+  if (previewMarker) { previewMarker.remove(); previewMarker = null; }
+}
+
 function renderMap() {
+  // Clear preview if active
+  clearRoutePreview();
   // Clear existing
   Object.values(state.mapMarkers).flat().forEach(m => m.remove());
   Object.values(state.mapRouteLines).flat().forEach(l => l.remove());
@@ -2334,7 +2394,10 @@ function buildQueueCard(card) {
       const prefLabel = best.isPreferredDay ? '<span style="color:rgba(110,160,50,0.8);font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
       const emptyLabel = best.stopsOnTruck === 0 ? '<span style="color:rgba(110,160,50,0.6);font-size:9px;margin-left:3px">· open route</span>' : '';
 
-      algoStrip = `<div class="algo-strip">
+      algoStrip = `<div class="algo-strip" 
+        onmouseenter="showRoutePreview('${card.id}','${best.dayKey}','${best.truck}',${best.insertPos})"
+        onmouseleave="clearRoutePreview()"
+        style="cursor:pointer">
         <span class="algo-icon">✦</span>
         <span class="algo-label">${dayNames[best.day]} ${wk}</span>
         <span class="algo-detail">· Truck ${best.truck} · Stop ${best.insertPos + 1}</span>
@@ -2347,7 +2410,9 @@ function buildQueueCard(card) {
         const alt = recs[1];
         const altWk = alt.dayKey?.includes('W2') ? 'Wk2' : 'Wk1';
         const altPref = alt.isPreferredDay ? ' ★' : '';
-        algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px">
+        algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px;cursor:pointer"
+          onmouseenter="showRoutePreview('${card.id}','${alt.dayKey}','${alt.truck}',${alt.insertPos})"
+          onmouseleave="clearRoutePreview()">
           <span class="algo-icon" style="font-size:9px">○</span>
           <span style="color:rgba(0,0,0,0.4);font-weight:500;font-size:10px;font-family:'Inter Tight',sans-serif">${dayNames[alt.day]} ${altWk} · Truck ${alt.truck} · Stop ${alt.insertPos + 1}${altPref}</span>
           <span class="algo-dist">${alt.minDist.toFixed(1)} mi</span>
@@ -2617,12 +2682,39 @@ function endDragQueueCard(e) {
 // ── DROP ZONE HANDLERS ──
 function handleTruckDragOver(e, dayKey, truck) {
   e.preventDefault();
+  const section = e.currentTarget;
+  const truckKey = `${dayKey}-${truck}`;
+
+  // Accept stop-to-stop drags (cross-truck reorder)
+  if (dragData) {
+    // Reject: locked truck
+    if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
+      section.classList.add('drop-reject');
+      section.classList.remove('drop-hover');
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    // Reject: same truck (handled by stop-level drop)
+    if (dragData.dayKey === dayKey && dragData.truck === truck) return;
+    // Reject: full
+    const stops = state.schedule[dayKey]?.[truck] || [];
+    if (stops.length >= 4) {
+      section.classList.add('drop-reject');
+      section.classList.remove('drop-hover');
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    section.classList.add('drop-hover');
+    section.classList.remove('drop-reject');
+    e.dataTransfer.dropEffect = 'move';
+    return;
+  }
+
+  // Queue card drag
   const cardId = state._draggingCardId;
-  if (!cardId) return; // not dragging a queue card
+  if (!cardId) return;
 
   const card = state.queueCards.find(c => c.id === cardId);
-  const truckKey = `${dayKey}-${truck}`;
-  const section = e.currentTarget;
 
   // Reject: no coords
   if (!card?.coords) {
@@ -2633,7 +2725,7 @@ function handleTruckDragOver(e, dayKey, truck) {
   }
 
   // Reject: locked truck
-  if (state.lockedTrucks[truckKey]) {
+  if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
     section.classList.add('drop-reject');
     section.classList.remove('drop-hover');
     e.dataTransfer.dropEffect = 'none';
@@ -2654,14 +2746,53 @@ function handleTruckDragLeave(e, el) {
   }
 }
 
-function handleTruckDrop(e, dayKey, truck) {
+function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   e.preventDefault();
   e.stopPropagation();
 
-  const section = e.currentTarget;
-  section.classList.remove('drop-hover');
-  section.classList.remove('drop-reject');
+  const section = e.currentTarget || e.target.closest('.truck-section');
+  if (section) {
+    section.classList.remove('drop-hover');
+    section.classList.remove('drop-reject');
+  }
 
+  // Case 1: Cross-truck stop reorder (dragData set by dragStop)
+  if (dragData) {
+    const { dayKey: fromDay, truck: fromTruck, idx: fromIdx } = dragData;
+    if (fromDay === dayKey && fromTruck === truck) { dragData = null; return; } // same truck, ignore
+
+    const fromStops = state.schedule[fromDay]?.[fromTruck];
+    const toStops = state.schedule[dayKey]?.[truck] || [];
+    if (!fromStops) { dragData = null; return; }
+
+    const truckKey = `${dayKey}-${truck}`;
+    if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
+      showToast(`🔒 ${truck} is locked`, 'warning');
+      dragData = null;
+      return;
+    }
+    if (toStops.length >= 4) {
+      showToast(`⚠ ${truck} is full (4 stops max)`, 'warning');
+      dragData = null;
+      return;
+    }
+
+    if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
+    if (!state.schedule[dayKey][truck]) state.schedule[dayKey][truck] = [];
+
+    const [moved] = fromStops.splice(fromIdx, 1);
+    const toPos = typeof insertAtIdx === 'number' ? insertAtIdx : state.schedule[dayKey][truck].length;
+    state.schedule[dayKey][truck].splice(toPos, 0, moved);
+    dragData = null;
+    renderRightPanel();
+    renderMap();
+
+    const toLabel = truck.replace('truck','Truck ').replace('a','A').replace('b','B').replace('c','C');
+    showToast(`↔ Moved to ${toLabel}, Stop ${toPos + 1}`, 'info');
+    return;
+  }
+
+  // Case 2: Queue card drop
   const cardId = e.dataTransfer.getData('text/plain');
   if (!cardId) return;
 
@@ -2677,7 +2808,7 @@ function handleTruckDrop(e, dayKey, truck) {
   }
 
   // Reject: locked
-  if (state.lockedTrucks[truckKey]) {
+  if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
     showToast('🔒 Truck is locked — unlock to add stops', 'error');
     return;
   }
@@ -2692,8 +2823,8 @@ function handleTruckDrop(e, dayKey, truck) {
     }
   }
 
-  // Find best insert position using algo
-  const insertPos = bestInsertPosition(stops, card.coords);
+  // Find best insert position using algo (or use specified position)
+  const insertPos = typeof insertAtIdx === 'number' ? insertAtIdx : bestInsertPosition(stops, card.coords);
 
   // Build stop object from card (staged, not committed)
   const newStop = {
@@ -2709,13 +2840,13 @@ function handleTruckDrop(e, dayKey, truck) {
     customerName: card.customerName,
     customerPhone: card.customerPhone,
     firstStopRequested: card.firstStopRequested,
-    firstStopApproved: card.firstStopRequested, // auto-approve if requested
+    firstStopApproved: card.firstStopRequested,
     whiteGlove: card.whiteGlove,
     equipRemoval: card.equipRemoval,
     stairs: card.stairs,
     dropoff: card.dropoff,
     deliveryNotes: card.deliveryNotes,
-    committed: false, // STAGED — not yet committed to Trello
+    committed: false,
   };
 
   // Insert into schedule
@@ -3046,23 +3177,126 @@ function dragStop(e, dayKey, truck, idx) {
 
 function dropStop(e, dayKey, truck, toIdx) {
   e.preventDefault();
+  e.stopPropagation(); // Don't bubble to truck-section drop handler
+
+  // Case 1: Queue card dropped onto a specific stop position
+  const cardId = e.dataTransfer.getData('text/plain');
+  if (cardId && !dragData) {
+    // Delegate to truck drop handler with specific insert position
+    handleTruckDrop(e, dayKey.replace('schedule-',''), truck, toIdx);
+    return;
+  }
+
   if (!dragData) return;
   const { dayKey: fromDay, truck: fromTruck, idx: fromIdx } = dragData;
 
-  // Only reorder within same truck for now
-  if (fromDay !== dayKey || fromTruck !== truck) {
-    showToast('Drag within same truck to reorder', 'info');
+  // Same truck reorder
+  if (fromDay === dayKey && fromTruck === truck) {
+    if (fromIdx === toIdx) { dragData = null; return; }
+    const stops = state.schedule[dayKey][truck];
+    const [moved] = stops.splice(fromIdx, 1);
+    stops.splice(toIdx, 0, moved);
+    dragData = null;
+    renderRightPanel();
+    renderMap();
+    showToast('Stop order updated', 'info');
+    return;
+  }
+
+  // Cross-truck move (same day or different day)
+  const fromStops = state.schedule[fromDay]?.[fromTruck];
+  const toStops = state.schedule[dayKey]?.[truck];
+  if (!fromStops || !toStops) { dragData = null; return; }
+
+  // Check capacity on target truck
+  if (toStops.length >= 4) {
+    showToast(`⚠ ${truck} is full (4 stops max)`, 'warning');
     dragData = null;
     return;
   }
 
-  const stops = state.schedule[dayKey][truck];
-  const [moved] = stops.splice(fromIdx, 1);
-  stops.splice(toIdx, 0, moved);
+  // Check if target truck is locked
+  const lockKey = `lock-${dayKey}-${truck}`;
+  if (state[lockKey]) {
+    showToast(`🔒 ${truck} is locked`, 'warning');
+    dragData = null;
+    return;
+  }
+
+  const [moved] = fromStops.splice(fromIdx, 1);
+  toStops.splice(toIdx, 0, moved);
   dragData = null;
   renderRightPanel();
   renderMap();
-  showToast('Stop order updated', 'info');
+
+  const fromLabel = fromTruck.replace('truck','Truck ').toUpperCase().replace('TRUCK ','Truck ');
+  const toLabel = truck.replace('truck','Truck ').toUpperCase().replace('TRUCK ','Truck ');
+  showToast(`↔ Moved to ${toLabel}, Stop ${toIdx + 1}`, 'info');
+}
+
+// ── DRAG STOP BACK TO QUEUE (UN-SCHEDULE) ──
+function handleQueueDragOver(e) {
+  if (!dragData) return; // only accept stop drags, not queue card drags
+  e.preventDefault();
+  e.currentTarget.style.outline = '2px dashed rgba(240,201,58,0.5)';
+  e.currentTarget.style.outlineOffset = '-2px';
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleQueueDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.style.outline = '';
+    e.currentTarget.style.outlineOffset = '';
+  }
+}
+
+function handleQueueDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.outline = '';
+  e.currentTarget.style.outlineOffset = '';
+
+  if (!dragData) return;
+  const { dayKey, truck, idx } = dragData;
+  const stops = state.schedule[dayKey]?.[truck];
+  if (!stops || !stops[idx]) { dragData = null; return; }
+
+  const stop = stops[idx];
+
+  // Don't allow un-scheduling committed stops
+  if (stop.committed) {
+    showToast('⚠ Already committed to Trello — cannot un-schedule', 'warning');
+    dragData = null;
+    return;
+  }
+
+  // Remove from schedule
+  stops.splice(idx, 1);
+
+  // Rebuild as queue card and add back
+  const queueCard = {
+    id: stop.cardId || stop.id,
+    shortLink: stop.shortLink,
+    name: stop.cardName || stop.name,
+    address: stop.address,
+    coords: stop.coords,
+    quadrant: stop.quadrant,
+    invTotal: stop.invTotal,
+    customerName: stop.customerName,
+    customerPhone: stop.customerPhone,
+    firstStopRequested: stop.firstStopRequested,
+    whiteGlove: stop.whiteGlove,
+    equipRemoval: stop.equipRemoval,
+    stairs: stop.stairs,
+    dropoff: stop.dropoff,
+    deliveryNotes: stop.deliveryNotes,
+  };
+  state.queueCards.push(queueCard);
+
+  dragData = null;
+  renderQueue();
+  renderRightPanel();
+  renderMap();
+  showToast(`↩ ${(stop.cardName || stop.name).split(' ').slice(0,3).join(' ')}… returned to queue`, 'info');
 }
 
 function toggleTruckB() {
