@@ -746,6 +746,7 @@ body {
   border-bottom: 1px solid rgba(0,0,0,0.04);
   transition: background 0.15s;
   position: relative;
+  flex-wrap: wrap;
 }
 
 .stop-item:last-child { border-bottom: none; }
@@ -776,8 +777,8 @@ body {
 
 .stop-item[draggable="true"]:hover { cursor: grab; }
 
-.stop-content { flex: 1; min-width: 0; }
-.stop-name { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-content { flex: 1; min-width: 0; overflow: hidden; }
+.stop-name { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .stop-meta { font-size: 10px; color: rgba(0,0,0,0.35); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
 
 .stop-flag {
@@ -796,6 +797,7 @@ body {
   gap: 4px;
   opacity: 0;
   transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 
 .stop-item:hover .stop-actions { opacity: 1; }
@@ -956,6 +958,7 @@ body {
   font-family: 'Inter Tight', sans-serif;
   color: rgba(160,120,0,0.4);
   letter-spacing: 0.01em;
+  flex-basis: 100%;
 }
 .staged-meta .staged-by {
   font-weight: 600;
