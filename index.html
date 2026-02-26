@@ -1462,7 +1462,7 @@ body {
   <div class="panel-left">
     <div class="panel-header">
       <div class="panel-title">
-        Requested
+        Pending
         <span class="badge" id="queue-badge">0</span>
       </div>
       <div class="panel-search">
@@ -1923,6 +1923,25 @@ function recommend(card) {
     }
   }
 
+  // If all 10 days are full, find next available working day beyond the window
+  if (!bestOption) {
+    const futureDays = allDays.filter(d => d.date >= new Date(new Date().setHours(0,0,0,0)));
+    const lastDay = futureDays[futureDays.length - 1];
+    if (lastDay) {
+      const nextDate = new Date(lastDay.date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
+        nextDate.setDate(nextDate.getDate() + 1);
+      }
+      const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+      bestOption = {
+        dayKey: null, day: dayNames[nextDate.getDay()], date: nextDate,
+        truck: 'A', insertPos: 0, minDist: distanceMiles(card.coords, FRUITLAND),
+        overflow: false, routesFull: true, nextAvailableDate: nextDate
+      };
+    }
+  }
+
   return bestOption;
 }
 
@@ -2164,7 +2183,15 @@ function buildQueueCard(card) {
     </div>`;
   } else {
     const rec = recommend(card);
-    if (rec) {
+    if (rec && rec.routesFull) {
+      // Routes full — suggest next available day beyond the 10-day window
+      const dateStr = rec.nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      algoStrip = `<div class="algo-strip" style="background:rgba(180,130,40,0.06)">
+        <span class="algo-icon" style="opacity:0.7">⏳</span>
+        <span style="color:rgba(160,110,30,0.65);font-weight:600;font-size:11px;font-family:'Inter Tight',sans-serif">Routes full</span>
+        <span style="color:rgba(160,110,30,0.45);font-size:10.5px;font-family:'Inter Tight',sans-serif">· Next opening ${dateStr}</span>
+      </div>`;
+    } else if (rec) {
       const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
       const wk = rec.dayKey.includes('W2') ? 'Wk2' : 'Wk1';
       algoStrip = `<div class="algo-strip">
@@ -2176,7 +2203,7 @@ function buildQueueCard(card) {
     } else {
       algoStrip = `<div class="algo-strip" style="background:rgba(0,0,0,0.02)">
         <span class="algo-icon" style="opacity:0.5">✦</span>
-        <span style="color:rgba(0,0,0,0.3);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">No available slot found</span>
+        <span style="color:rgba(0,0,0,0.3);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Calculating best route…</span>
       </div>`;
     }
   }
