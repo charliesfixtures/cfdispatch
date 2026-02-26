@@ -733,6 +733,21 @@ body {
 .truck-lock-btn:hover { background: rgba(0,0,0,0.04); color: rgba(0,0,0,0.4); }
 .truck-lock-btn.locked { background: rgba(224,122,95,0.1); border-color: rgba(224,122,95,0.3); color: var(--danger); }
 
+.truck-section.truck-locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.truck-section.truck-locked .truck-header {
+  pointer-events: all;
+}
+.truck-section.truck-locked .truck-lock-btn {
+  pointer-events: all;
+}
+.truck-section.truck-locked .truck-empty {
+  color: rgba(180,90,40,0.45);
+  font-style: italic;
+}
+
 /* Stop items */
 .stops-list {
   border-top: 1px solid rgba(0,0,0,0.06);
@@ -2624,7 +2639,7 @@ function renderRouteSheet() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>`;
 
-    html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''}"
+    html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''} ${isLocked ? 'truck-locked' : ''}"
       ondragover="handleTruckDragOver(event,'${key}','${truck}')"
       ondragleave="handleTruckDragLeave(event,this)"
       ondrop="handleTruckDrop(event,'${key}','${truck}')">
@@ -2632,17 +2647,17 @@ function renderRouteSheet() {
         ${avatarHTML}
         <div class="truck-info">
           <div class="truck-name">${driverName || '<span style="color:rgba(0,0,0,0.25);font-style:italic">No driver</span>'}</div>
-          <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}${isUnavailable ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
+          <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">Unavailable</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
-        <button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}')" title="${isLocked ? 'Unlock route' : 'Lock route'}">
+        <button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck (unavailable)'}">
           ${isLocked ? '🔒' : '🔓'}
         </button>
       </div>`;
 
     if (stops.length === 0) {
       html += `<div class="stops-list">
-        <div class="truck-empty">No stops — drag a card here or use Schedule</div>
+        <div class="truck-empty">${isLocked ? 'Truck unavailable — unlock to open' : 'No stops — drag a card here or use Schedule'}</div>
       </div>`;
     } else {
       html += `<div class="stops-list">
@@ -3455,11 +3470,136 @@ function toggleTruckC() {
   renderRightPanel();
 }
 
-function toggleTruckLock(truckKey) {
-  state.lockedTrucks[truckKey] = !state.lockedTrucks[truckKey];
-  renderRightPanel();
-  showToast(state.lockedTrucks[truckKey] ? '🔒 Route locked' : '🔓 Route unlocked', 'info');
+function toggleTruckLock(truckKey, dayKey, truck) {
+  const isCurrentlyLocked = state.lockedTrucks[truckKey];
+
+  if (isCurrentlyLocked) {
+    // UNLOCK — simple
+    state.lockedTrucks[truckKey] = false;
+    saveLockState();
+    renderRightPanel();
+    renderMap();
+    showToast('🔓 Truck unlocked — available for scheduling', 'info');
+    return;
+  }
+
+  // LOCK — check if truck has stops
+  const stops = state.schedule[dayKey]?.[truck] || [];
+
+  if (stops.length === 0) {
+    // Empty truck — lock immediately
+    state.lockedTrucks[truckKey] = true;
+    saveLockState();
+    renderRightPanel();
+    renderMap();
+    showToast('🔒 Truck locked — unavailable', 'info');
+    return;
+  }
+
+  // Truck has stops — confirm dialog
+  const committedCount = stops.filter(s => s.committed).length;
+  const totalCount = stops.length;
+  const msg = committedCount > 0
+    ? `${totalCount} stop${totalCount > 1 ? 's' : ''} (${committedCount} committed) will return to Pending. Trello changes will be undone.`
+    : `${totalCount} stop${totalCount > 1 ? 's' : ''} will return to Pending.`;
+
+  showConfirm(
+    '🔒',
+    `Lock Truck ${truck}?`,
+    msg,
+    async () => {
+      // Bounce all stops back to queue
+      const stopsToReturn = [...stops];
+      state.schedule[dayKey][truck] = [];
+
+      for (const stop of stopsToReturn) {
+        if (stop.committed) {
+          // Committed card — undo Trello changes
+          try {
+            // 1. Get card member username for @mention
+            let memberMention = '';
+            try {
+              const members = await trello(`/cards/${stop.id}/members`);
+              if (members && members.length > 0) {
+                memberMention = ` @${members[0].username}`;
+              }
+            } catch(e) { /* no member found, skip mention */ }
+
+            // 2. Move to Requested for Schedule FIRST (before clearing due date to prevent Butler conflict)
+            const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
+            const rsList = lists.find(l => l.name.toLowerCase().includes('requested for schedule'));
+            if (rsList) {
+              await trello(`/cards/${stop.id}`, 'PUT', { idList: rsList.id });
+            }
+
+            // 3. Clear due date
+            await trello(`/cards/${stop.id}`, 'PUT', { due: null });
+
+            // 4. Clear OT field
+            await trello(`/cards/${stop.id}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
+
+            // 5. Post comment with @mention for Butler → Slack notification
+            await trello(`/cards/${stop.id}/actions/comments`, 'POST', {
+              text: `🔒 Truck unavailable — returned to Pending via CF Dispatch${memberMention}`
+            });
+          } catch(e) {
+            console.error('Failed to undo Trello for', stop.name, e);
+          }
+        }
+
+        // Return card to queue
+        state.queueCards.push({
+          id: stop.cardId || stop.id,
+          shortLink: stop.shortLink,
+          name: stop.cardName || stop.name,
+          address: stop.address,
+          coords: stop.coords,
+          quadrant: stop.quadrant,
+          invTotal: stop.invTotal,
+          customerName: stop.customerName,
+          customerPhone: stop.customerPhone,
+          firstStopRequested: stop.firstStopRequested,
+          whiteGlove: stop.whiteGlove,
+          equipRemoval: stop.equipRemoval,
+          stairs: stop.stairs,
+          dropoff: stop.dropoff,
+          deliveryNotes: stop.deliveryNotes,
+          rider: stop.rider,
+          rsValue: stop.rsValue,
+        });
+      }
+
+      // Lock the truck
+      state.lockedTrucks[truckKey] = true;
+      saveLockState();
+
+      renderQueue();
+      renderRightPanel();
+      renderMap();
+
+      showToast(`🔒 Truck ${truck} locked — ${totalCount} stop${totalCount > 1 ? 's' : ''} returned to Pending`, 'info');
+    }
+  );
 }
+
+// ── LOCK STATE PERSISTENCE ──
+function saveLockState() {
+  try {
+    localStorage.setItem('cf-dispatch-locks', JSON.stringify(state.lockedTrucks));
+  } catch(e) { /* localStorage unavailable */ }
+}
+
+function loadLockState() {
+  try {
+    const saved = localStorage.getItem('cf-dispatch-locks');
+    if (saved) {
+      state.lockedTrucks = JSON.parse(saved);
+    }
+  } catch(e) { /* localStorage unavailable */ }
+}
+
+// ── QUEUE SORT HELPER ──
+// Note: renderQueue() already sorts by RS date → creation date. No separate sort needed.
 
 // ════════════════════════════════════════════════════════
 // DRIVER PICKER (inline popover)
@@ -4015,6 +4155,9 @@ setInterval(loadData, 60000);
 // ════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
+
+  // Restore lock state from localStorage
+  loadLockState();
 
   // Set default right panel day to next Monday
   const week1 = getWeekDates(0);
