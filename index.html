@@ -1571,14 +1571,13 @@ body {
 .dt-pending { color: rgba(230,100,80,0.7); font-weight: 600; }
 .dt-scheduled { color: rgba(76,155,60,0.8); font-weight: 600; }
 
-/* Driver info tooltip — glass style, pops left of avatar */
+/* Driver info tooltip — glass style, pops below avatar */
 .driver-tip-wrap { position: relative; display: inline-block; }
 .driver-tip-wrap .driver-tip {
   display: none;
   position: absolute;
-  right: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%);
+  left: 0;
+  top: calc(100% + 6px);
   background: rgba(235,230,220,0.94);
   backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
   -webkit-backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
@@ -2927,7 +2926,7 @@ function renderRouteSheet() {
     // Build glass tooltip HTML from driver info
     const driverTipRows = driver?.driverInfo
       ? Object.entries(driver.driverInfo).map(([k, v]) => {
-          const icons = { phone: '📞', license: '🪪', vehicle: '🚛', email: '📧' };
+          const icons = { phone: '📞', mobile: '📱', cell: '📱', license: '🪪', vehicle: '🚛', email: '📧' };
           const icon = icons[k] || '•';
           return `<div class="dt-driver-row">${icon} ${v}</div>`;
         }).join('')
@@ -2997,12 +2996,13 @@ function renderRouteSheet() {
               ${flags}
             </div>
           </div>
+          ${isCommitted && stop.requesterAvatar ? `<img src="${stop.requesterAvatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid var(--success);flex-shrink:0" title="${stop.requesterName || 'Salesperson'}" />` : ''}
+          ${isCommitted && !stop.requesterAvatar ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif;flex-shrink:0">✓</span>' : ''}
           <div class="stop-actions">
             ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
-            ${isCommitted && stop.requesterAvatar ? `<img src="${stop.requesterAvatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid var(--success);margin-right:2px" title="${stop.requesterName || 'Salesperson'}" />` : ''}
-            ${isCommitted && !stop.requesterAvatar ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif">✓</span>' : ''}
-            <button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit">✎</button>
-            ${isCommitted ? `<button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Remove (will undo Trello)">✕</button>` : ''}
+            ${isCommitted ? `<button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit details">✎</button>` : ''}
+            ${isCommitted ? `<button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Uncommit">✕</button>` : ''}
+            ${isStaged ? `<button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit">✎</button>` : ''}
           </div>
           ${isStaged && stop.stagedAt ? `<div class="staged-meta"><span class="staged-by">${stop.stagedBy || ''}</span><span class="staged-time">Staged ${new Date(stop.stagedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span></div>` : ''}
         </div>`;
@@ -4194,7 +4194,7 @@ async function loadDrivers() {
     }
 
     // Phone: try checklist first, then description fallback
-    const phone = checklistData.phone || checklistData['phone number'] || checklistData.cell || (() => {
+    const phone = checklistData.phone || checklistData['phone number'] || checklistData.mobile || checklistData.cell || (() => {
       const phoneMatch = c.desc?.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4})/);
       return phoneMatch ? phoneMatch[1].trim() : null;
     })();
