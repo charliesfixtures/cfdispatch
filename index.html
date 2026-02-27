@@ -1527,19 +1527,29 @@ body {
 .lm-r { font-size: 12px; color: rgba(0,0,0,0.4); margin: 2px 0; }
 .lm-h { font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.06); }
 
-/* Route line animation — marching dashes show direction of travel */
-@keyframes flowDash {
+/* Route line animation — Truck A: slow dashes, Truck B: fast dots */
+@keyframes flowDashA {
   from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: -24; }
+  to { stroke-dashoffset: -28; }
+}
+@keyframes flowDashB {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -16; }
 }
 .route-line {
-  /* Static by default — animation applied via .route-animate */
+  /* Static by default — animation applied via .route-animate-a / .route-animate-b */
 }
-.route-line.route-animate {
-  animation: flowDash 0.8s linear infinite;
+.route-line.route-animate-a {
+  animation: flowDashA 1s linear infinite;
+  opacity: 0.75;
+}
+.route-line.route-animate-b {
+  animation: flowDashB 0.35s linear infinite;
+  opacity: 0.75;
 }
 .route-line.route-dim {
   opacity: 0.2 !important;
+  animation: none !important;
 }
 
 /* Map dot hover tooltip (pending + scheduled) */
@@ -2470,9 +2480,9 @@ function renderMap() {
       const routePoints = [FRUITLAND, ...stops.map(s => s.coords), HQ];
 
       // Route line — Truck B gets lighter opacity to differentiate
-      const truckOpacity = truck === 'A' ? 0.65 : 0.5;
-      const truckWeight = truck === 'A' ? 3 : 3;
-      const truckDash = truck === 'A' ? '8 6' : '2 6';
+      const truckOpacity = 0.75;
+      const truckWeight = truck === 'A' ? 1.5 : 2.5;
+      const truckDash = truck === 'A' ? '10 6' : '2 6';
       const line = L.polyline(
         routePoints.map(p => [p.lat, p.lng]),
         {
@@ -2570,18 +2580,20 @@ function updateRouteAnimation() {
       if (!el) return;
 
       // Reset classes
-      el.classList.remove('route-animate', 'route-dim');
+      el.classList.remove('route-animate-a', 'route-animate-b', 'route-dim');
+
+      const animClass = line._routeTruck === 'A' ? 'route-animate-a' : 'route-animate-b';
 
       if (selectedCard && selectedRouteKey) {
         // Card is selected AND it's on a route
         if (line._routeKey === selectedRouteKey && line._routeTruck === selectedRouteTruck) {
-          el.classList.add('route-animate');
+          el.classList.add(animClass);
         } else {
           el.classList.add('route-dim');
         }
       } else {
         // No card selected (or card is still pending) — animate all visible routes
-        el.classList.add('route-animate');
+        el.classList.add(animClass);
       }
     });
   }
