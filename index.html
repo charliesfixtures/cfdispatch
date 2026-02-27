@@ -2470,15 +2470,16 @@ function renderMap() {
       const routePoints = [FRUITLAND, ...stops.map(s => s.coords), HQ];
 
       // Route line — Truck B gets lighter opacity to differentiate
-      const truckOpacity = truck === 'A' ? 0.6 : 0.4;
-      const truckWeight = truck === 'A' ? (weekNum === 2 ? 3 : 2.5) : (weekNum === 2 ? 2.5 : 2);
+      const truckOpacity = truck === 'A' ? 0.65 : 0.5;
+      const truckWeight = truck === 'A' ? 3 : 3;
+      const truckDash = truck === 'A' ? '8 6' : '2 6';
       const line = L.polyline(
         routePoints.map(p => [p.lat, p.lng]),
         {
           color: dayColor,
           weight: truckWeight,
           opacity: truckOpacity,
-          dashArray: weekNum === 2 ? '8 4' : '6 3',
+          dashArray: truckDash,
           smoothFactor: 2,
           className: `route-line route-${key}-${truck}`,
         }
@@ -3053,7 +3054,8 @@ function dragQueueCard(e, cardId) {
 function endDragQueueCard(e) {
   e.target.classList.remove('dragging');
   // Clean up any lingering drop-hover states
-  document.querySelectorAll('.truck-section.drop-hover').forEach(el => el.classList.remove('drop-hover'));
+  document.querySelectorAll('.truck-section.drop-hover').forEach(el => { el.classList.remove('drop-hover'); el.style.opacity = ''; });
+  document.querySelectorAll('.truck-section.drop-reject').forEach(el => { el.classList.remove('drop-reject'); el.style.opacity = ''; });
   state._draggingCardId = null;
 }
 
@@ -3120,6 +3122,7 @@ function handleTruckDragLeave(e, el) {
   if (!el.contains(e.relatedTarget)) {
     el.classList.remove('drop-hover');
     el.classList.remove('drop-reject');
+    el.style.opacity = '';
   }
 }
 
@@ -3131,6 +3134,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   if (section) {
     section.classList.remove('drop-hover');
     section.classList.remove('drop-reject');
+    section.style.opacity = '';
   }
 
   // Case 1: Cross-truck stop reorder (dragData set by dragStop)
