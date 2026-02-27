@@ -616,7 +616,7 @@ body {
 }
 
 .truck-driver-img {
-  width: 24px; height: 24px;
+  width: 36px; height: 36px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(0,0,0,0.1);
@@ -692,8 +692,8 @@ body {
 }
 
 .truck-info { flex: 1; }
-.truck-name { font-size: 13px; font-weight: 700; color: rgba(0,0,0,0.6); font-family: 'Inter Tight', sans-serif; }
-.truck-label { font-size: 10px; color: rgba(0,0,0,0.35); font-family: 'Inter Tight', sans-serif; margin-top: 1px; }
+.truck-name { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.6); font-family: 'Inter Tight', sans-serif; }
+.truck-label { font-size: 10.5px; color: rgba(0,0,0,0.35); font-family: 'Inter Tight', sans-serif; margin-top: 2px; }
 
 .capacity-bar-wrap {
   display: flex;
@@ -1571,6 +1571,30 @@ body {
 .dt-pending { color: rgba(230,100,80,0.7); font-weight: 600; }
 .dt-scheduled { color: rgba(76,155,60,0.8); font-weight: 600; }
 
+/* Driver info tooltip — glass style, pops left of avatar */
+.driver-tip-wrap { position: relative; display: inline-block; }
+.driver-tip-wrap .driver-tip {
+  display: none;
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(235,230,220,0.94);
+  backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  padding: 10px 14px;
+  font-family: 'Inter Tight', sans-serif;
+  white-space: nowrap;
+  z-index: 500;
+  pointer-events: none;
+}
+.driver-tip-wrap:hover .driver-tip { display: block; }
+.driver-tip .dt-driver-name { font-size: 13px; font-weight: 700; color: rgba(0,0,0,0.65); margin-bottom: 4px; }
+.driver-tip .dt-driver-row { font-size: 11px; color: rgba(0,0,0,0.45); line-height: 1.6; }
+
 .landmark-icon {
   width: 30px;
   height: 30px;
@@ -1813,7 +1837,7 @@ body {
     </div>
     <div class="truck-c-wrap" id="truck-c-wrap">
       <button class="truck-c-btn" id="truck-b-btn" onclick="toggleTruckB()">+ Add Truck B</button>
-      <button class="truck-c-btn" id="truck-c-btn" onclick="toggleTruckC()" style="display:none">+ Add Truck C</button>
+      <button class="truck-c-btn" id="truck-c-btn" onclick="toggleTruckC()" style="display:none">+ Add Route C</button>
     </div>
   </div>
 
@@ -1847,9 +1871,9 @@ body {
       <div class="form-group">
         <label class="form-label">Truck</label>
         <select class="form-select" id="modal-truck">
-          <option value="A">Truck A</option>
-          <option value="B">Truck B</option>
-          <option value="C">Truck C</option>
+          <option value="A">Route A</option>
+          <option value="B">Route B</option>
+          <option value="C">Route C</option>
         </select>
       </div>
     </div>
@@ -2903,22 +2927,29 @@ function renderRouteSheet() {
     const driverInfoLines = driver?.driverInfo
       ? Object.entries(driver.driverInfo).map(([k, v]) => {
           const icons = { phone: '📞', license: '🪪', vehicle: '🚛', email: '📧' };
+    // Build glass tooltip HTML from driver info
+    const driverTipRows = driver?.driverInfo
+      ? Object.entries(driver.driverInfo).map(([k, v]) => {
+          const icons = { phone: '📞', license: '🪪', vehicle: '🚛', email: '📧' };
           const icon = icons[k] || '•';
-          return `${icon} ${v}`;
-        }).join('\n')
+          return `<div class="dt-driver-row">${icon} ${v}</div>`;
+        }).join('')
       : '';
-    const driverTooltip = driver
-      ? `${driverName}${driverInfoLines ? '\n' + driverInfoLines : ''}\nClick to change driver`
-      : 'Assign a driver';
+    const driverTipHTML = driver
+      ? `<div class="driver-tip"><div class="dt-driver-name">${driverName}</div>${driverTipRows}</div>`
+      : '';
 
     // Avatar HTML — either assigned driver photo or placeholder
     const avatarHTML = driver
-      ? `<div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverTooltip}">
-          <img class="truck-driver-img" src="${driverImg}" onerror="this.style.background='#2e3850';this.src=''" alt="${driverName}" />
-          ${isUnavailable ? '<div class="driver-unavail-badge">!</div>' : ''}
+      ? `<div class="driver-tip-wrap">
+          <div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)">
+            <img class="truck-driver-img" src="${driverImg}" onerror="this.style.background='#2e3850';this.src=''" alt="${driverName}" />
+            ${isUnavailable ? '<div class="driver-unavail-badge">!</div>' : ''}
+          </div>
+          ${driverTipHTML}
         </div>`
-      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverTooltip}">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Assign a driver">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>`;
 
     html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''} ${isLocked ? 'truck-locked' : ''}"
@@ -2929,7 +2960,7 @@ function renderRouteSheet() {
         ${avatarHTML}
         <div class="truck-info">
           <div class="truck-name">${driverName || '<span style="color:rgba(0,0,0,0.25);font-style:italic">No driver</span>'}</div>
-          <div class="truck-label">Truck ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">Unavailable</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
+          <div class="truck-label">Route ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">Unavailable</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
         <button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck (unavailable)'}">
@@ -2971,7 +3002,8 @@ function renderRouteSheet() {
           </div>
           <div class="stop-actions">
             ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
-            ${isCommitted ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif">✓</span>' : ''}
+            ${isCommitted && stop.requesterAvatar ? `<img src="${stop.requesterAvatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid var(--success);margin-right:2px" title="${stop.requesterName || 'Salesperson'}" />` : ''}
+            ${isCommitted && !stop.requesterAvatar ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif">✓</span>' : ''}
             <button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit">✎</button>
             ${isCommitted ? `<button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Remove (will undo Trello)">✕</button>` : ''}
           </div>
@@ -2994,7 +3026,7 @@ function renderRouteSheet() {
   if (state.showTruckB) {
     if (btnB) btnB.style.display = 'none';
     if (btnC) btnC.style.display = 'block';
-    if (btnC) btnC.textContent = state.showTruckC ? '− Remove Truck C' : '+ Add Truck C';
+    if (btnC) btnC.textContent = state.showTruckC ? '− Remove Route C' : '+ Add Route C';
   } else {
     if (btnB) btnB.style.display = 'block';
     if (btnC) btnC.style.display = 'none';
@@ -3176,7 +3208,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
       return;
     }
     if (toStops.length >= MAX_STOPS) {
-      showToast(`⚠ Truck ${truck} is over capacity (${toStops.length + 1}/${MAX_STOPS})`, 'warning');
+      showToast(`⚠ Route ${truck} is over capacity (${toStops.length + 1}/${MAX_STOPS})`, 'warning');
     }
 
     if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
@@ -3211,7 +3243,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
 
   // Reject: locked
   if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
-    showToast('🔒 Truck is locked — unlock to add stops', 'error');
+    showToast('🔒 Route is locked — unlock to add stops', 'error');
     return;
   }
 
@@ -3220,7 +3252,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   if (stops.length >= MAX_STOPS) {
     const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
     if (minDist > OVERFLOW_RADIUS_MILES) {
-      showToast(`Truck ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
+      showToast(`Route ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
       return;
     }
     showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — card is nearby, allowed`, 'warning');
@@ -3269,7 +3301,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   renderRightPanel();
   renderMap();
 
-  showToast(`📦 ${card.name.split(' ').slice(0,3).join(' ')}… → Truck ${truck}, Stop ${insertPos + 1}`, 'info');
+  showToast(`📦 ${card.name.split(' ').slice(0,3).join(' ')}… → Route ${truck}, Stop ${insertPos + 1}`, 'info');
 }
 
 // ── PER-CARD COMMIT TO TRELLO ──
@@ -3310,7 +3342,7 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
     }
 
     // 3. Add comment with scheduling info
-    const comment = `📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Truck ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n📍 Via CF Dispatch`;
+    const comment = `📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Route ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n📍 Via CF Dispatch`;
     await trello(`/cards/${stop.cardId}/actions/comments`, 'POST', { text: comment });
 
     // 4. Move card to salesperson's shipper list
@@ -3491,7 +3523,7 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
   // Update right panel active day
   state.activeRightDay = dayKey;
 
-  showToast(`Scheduled: ${card.name} → ${dayKey} Truck ${truck}`, 'success');
+  showToast(`Scheduled: ${card.name} → ${dayKey} Route ${truck}`, 'success');
   renderQueue();
   renderRightPanel();
   renderMap();
@@ -3754,7 +3786,7 @@ function toggleTruckB() {
 function toggleTruckC() {
   state.showTruckC = !state.showTruckC;
   const btn = document.getElementById('truck-c-btn');
-  if (btn) btn.textContent = state.showTruckC ? '− Remove Truck C' : '+ Add Truck C';
+  if (btn) btn.textContent = state.showTruckC ? '− Remove Route C' : '+ Add Route C';
   renderRightPanel();
 }
 
@@ -3767,7 +3799,7 @@ function toggleTruckLock(truckKey, dayKey, truck) {
     saveLockState();
     renderRightPanel();
     renderMap();
-    showToast('🔓 Truck unlocked — available for scheduling', 'info');
+    showToast('🔓 Route unlocked — available for scheduling', 'info');
     return;
   }
 
@@ -3780,7 +3812,7 @@ function toggleTruckLock(truckKey, dayKey, truck) {
     saveLockState();
     renderRightPanel();
     renderMap();
-    showToast('🔒 Truck locked — unavailable', 'info');
+    showToast('🔒 Route locked — unavailable', 'info');
     return;
   }
 
@@ -3793,7 +3825,7 @@ function toggleTruckLock(truckKey, dayKey, truck) {
 
   showConfirm(
     '🔒',
-    `Lock Truck ${truck}?`,
+    `Lock Route ${truck}?`,
     msg,
     async () => {
       // Bounce all stops back to queue
@@ -3865,7 +3897,7 @@ function toggleTruckLock(truckKey, dayKey, truck) {
       renderRightPanel();
       renderMap();
 
-      showToast(`🔒 Truck ${truck} locked — ${totalCount} stop${totalCount > 1 ? 's' : ''} returned to Pending`, 'info');
+      showToast(`🔒 Route ${truck} locked — ${totalCount} stop${totalCount > 1 ? 's' : ''} returned to Pending`, 'info');
     }
   );
 }
@@ -3910,7 +3942,7 @@ function openDriverPicker(dayKey, truck, anchorEl) {
   picker.style.top = `${rect.bottom + 6}px`;
   picker.style.left = `${rect.left}px`;
 
-  let html = `<div class="driver-picker-title">Assign driver · Truck ${truck}</div>`;
+  let html = `<div class="driver-picker-title">Assign driver · Route ${truck}</div>`;
 
   // "Unassign" option if currently assigned
   if (currentDriverId) {
@@ -3979,7 +4011,7 @@ function assignDriverToTruck(dayKey, truck, driverId) {
 
   if (driverId === null || driverId === 'null') {
     delete state.truckDrivers[truckKey];
-    showToast(`Truck ${truck} driver removed`, 'info');
+    showToast(`Route ${truck} driver removed`, 'info');
   } else {
     // Check if driver is unavailable — warn but still allow
     const driver = state.drivers.find(d => d.id === driverId);
@@ -3997,9 +4029,9 @@ function assignDriverToTruck(dayKey, truck, driverId) {
     const name = driver?.name?.split(' ')[0] || 'Driver';
 
     if (status && !status.available) {
-      showToast(`⚠ ${name} assigned to Truck ${truck} — but ${status.label}`, 'error');
+      showToast(`⚠ ${name} assigned to Route ${truck} — but ${status.label}`, 'error');
     } else {
-      showToast(`${name} → Truck ${truck}`, 'success');
+      showToast(`${name} → Route ${truck}`, 'success');
     }
   }
 
