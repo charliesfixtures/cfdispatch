@@ -2515,10 +2515,11 @@ function renderMap() {
         const dates = [...getWeekDates(0), ...getWeekDates(1)];
         const dayInfo = dates.find(d => d.key === key);
         const dateLabel = dayInfo ? dayInfo.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : key;
-        const stopOwner = stop.requesterName || stop.salesperson || 'Unassigned';
+        const stopOwner = stop.requesterName || stop.salesperson || null;
         const statusLabel = stop.committed ? 'Scheduled' : 'Pending';
         const statusClass = stop.committed ? 'dt-scheduled' : 'dt-pending';
-        const stopTipHtml = `<div class="dt-name">${stop.name}</div><div class="dt-owner">\u{1F464} ${stopOwner}</div><div class="dt-status"><span class="${statusClass}">\u25CF ${statusLabel} \u00B7 ${dateLabel}</span></div>`;
+        const stopOwnerLine = stopOwner ? `<div class="dt-owner">\u{1F464} ${stopOwner}</div>` : "";
+        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopOwnerLine}<div class="dt-status"><span class="${statusClass}">\u25CF ${statusLabel} \u00B7 ${dateLabel}</span></div>`;
 
         const marker = L.marker([stop.coords.lat, stop.coords.lng], { icon })
           .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
@@ -2533,8 +2534,9 @@ function renderMap() {
   // Unscheduled dots — always visible so manager can see pending cards alongside any day's routes
   state.queueCards.forEach((card, idx) => {
       if (!card.coords) return;
-      const owner = card.requesterName || card.salesperson || 'Unassigned';
-      const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">\u{1F464} ${owner}</div><div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
+      const owner = card.requesterName || card.salesperson || null;
+      const ownerLine = owner ? `<div class="dt-owner">\u{1F464} ${owner}</div>` : '';
+      const tipHtml = `<div class="dt-name">${card.name}</div>${ownerLine}<div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
       const urgency = parseRS(card.rsValue).type === 'asap' ? 'asap' : 'normal';
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin(urgency) })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
@@ -2898,13 +2900,17 @@ function renderRouteSheet() {
       `<div class="cap-dot ${i < stops.length ? (stops.length > MAX_STOPS ? 'overflow' : 'filled') : ''}"></div>`
     ).join('');
 
+    const driverPhoneTitle = driver
+      ? `${driverName}${driver.phone ? '\n📞 ' + driver.phone : ''}\nClick to change driver`
+      : 'Assign a driver';
+
     // Avatar HTML — either assigned driver photo or placeholder
     const avatarHTML = driver
-      ? `<div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Click to change driver">
+      ? `<div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverPhoneTitle}">
           <img class="truck-driver-img" src="${driverImg}" onerror="this.style.background='#2e3850';this.src=''" alt="${driverName}" />
           ${isUnavailable ? '<div class="driver-unavail-badge">!</div>' : ''}
         </div>`
-      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Assign a driver">
+      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverPhoneTitle}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>`;
 
@@ -3229,6 +3235,8 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     invTotal: card.invTotal,
     customerName: card.customerName,
     customerPhone: card.customerPhone,
+    requesterName: card.requesterName,
+    requesterAvatar: card.requesterAvatar,
     firstStopRequested: card.firstStopRequested,
     firstStopApproved: card.firstStopRequested,
     whiteGlove: card.whiteGlove,
@@ -4134,13 +4142,18 @@ async function loadData() {
 
 async function loadDrivers() {
   const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&fields=id,name,due,start&limit=50`);
-  state.drivers = cards.map((c) => ({
-    id: c.id,
-    name: c.name,
-    photo: c.attachments?.find(a => a.previews?.length)?.previews?.slice(-1)[0]?.url || null,
-    unavailableFrom: c.start || null,
-    unavailableUntil: c.due || null,
-  }));
+  state.drivers = cards.map((c) => {
+    // Parse phone from card description (looks for patterns like 123-456-7890, (123) 456-7890, etc.)
+    const phoneMatch = c.desc?.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4})/);
+    return {
+      id: c.id,
+      name: c.name,
+      phone: phoneMatch ? phoneMatch[1].trim() : null,
+      photo: c.attachments?.find(a => a.previews?.length)?.previews?.slice(-1)[0]?.url || null,
+      unavailableFrom: c.start || null,
+      unavailableUntil: c.due || null,
+    };
+  });
 
   // Restore saved driver assignments from localStorage
   try {
