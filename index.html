@@ -2440,7 +2440,7 @@ function renderMap() {
 
         const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
         const schedDay = dayNames[key.split('-')[0]] || key;
-        const stopOwner = stop.salesperson || 'Unassigned';
+        const stopOwner = stop.requesterName || stop.salesperson || 'Unassigned';
         const committed = stop.committed ? 'Committed' : 'Staged';
         const stopTipHtml = `<div class="dt-name">${stop.name}</div><div class="dt-owner">👤 ${stopOwner}</div><div class="dt-status"><span class="dt-scheduled">● ${committed} · ${schedDay} · Truck ${truck}</span></div>`;
 
@@ -2458,8 +2458,8 @@ function renderMap() {
   if (activeFilter === 'ALL' || !activeFilter) {
     state.queueCards.forEach((card, idx) => {
       if (!card.coords) return;
-      const owner = card.salesperson || 'Unassigned';
-      const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">👤 ${owner}</div><div class="dt-status"><span class="dt-pending">● Pending</span></div>`;
+      const owner = card.requesterName || card.salesperson || 'Unassigned';
+      const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">\u{1F464} ${owner}</div><div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin() })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
