@@ -2078,16 +2078,36 @@ function bestInsertPosition(existing, newCoords) {
 // DATE UTILITIES
 // ════════════════════════════════════════════════════════
 function getWeekDates(weekOffset = 0) {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + (weekOffset * 7));
-  monday.setHours(0,0,0,0);
-  return DAYS.map((d, i) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
-    return { day: d, date, key: `${d}-W${weekOffset+1}` };
-  });
+  // Rolling 10-day window: always returns next 10 working days from today
+  // weekOffset 0 = days 1-5, weekOffset 1 = days 6-10
+  const allDays = getNext10WorkingDays();
+  const start = weekOffset * 5;
+  return allDays.slice(start, start + 5);
+}
+
+function getNext10WorkingDays() {
+  const days = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cursor = new Date(today);
+  let weekNum = 1;
+  let count = 0;
+
+  while (days.length < 10) {
+    const dow = cursor.getDay();
+    if (dow !== 0 && dow !== 6) { // Skip weekends
+      count++;
+      if (count > 5) weekNum = 2;
+      const dayName = DAYS[dow - 1]; // DAYS = ['MON','TUE','WED','THU','FRI']
+      days.push({
+        day: dayName,
+        date: new Date(cursor),
+        key: `${dayName}-W${weekNum}`
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
 }
 
 function workingDaysBetween(a, b) {
@@ -2436,10 +2456,10 @@ function renderMap() {
   const activeFilter = state.activeDayFilter;
 
   for (const { day, key } of allDays) {
-    if (activeFilter !== 'ALL' && day !== activeFilter) continue;
+    if (activeFilter !== 'ALL' && key !== activeFilter) continue;
 
     const weekNum = key.includes('W1') ? 1 : 2;
-    const dayColor = DAY_COLORS[day];
+    const dayColor = getDayColor(day, key);
     const daySchedule = state.schedule[key] || {};
 
     for (const [truck, stops] of Object.entries(daySchedule)) {
@@ -2449,13 +2469,15 @@ function renderMap() {
       const driverOrFallback = driver || state.drivers[0]; // fallback for route planning, not for pins
       const routePoints = [FRUITLAND, ...stops.map(s => s.coords), HQ];
 
-      // Route line
+      // Route line — Truck B gets lighter opacity to differentiate
+      const truckOpacity = truck === 'A' ? 0.6 : 0.4;
+      const truckWeight = truck === 'A' ? (weekNum === 2 ? 3 : 2.5) : (weekNum === 2 ? 2.5 : 2);
       const line = L.polyline(
         routePoints.map(p => [p.lat, p.lng]),
         {
           color: dayColor,
-          weight: weekNum === 2 ? 3 : 2,
-          opacity: 0.6,
+          weight: truckWeight,
+          opacity: truckOpacity,
           dashArray: weekNum === 2 ? '8 4' : '6 3',
           smoothFactor: 2,
           className: `route-line route-${key}-${truck}`,
@@ -2467,12 +2489,16 @@ function renderMap() {
       if (!state.mapRouteLines[key]) state.mapRouteLines[key] = [];
       state.mapRouteLines[key].push(line);
 
-      // Stop pins
+      // Stop pins — circle for Truck A, rounded square for Truck B
       stops.forEach((stop, i) => {
         if (!stop.coords) return;
-        const icon = driver
-          ? createDriverPin(driver, i + 1, dayColor)
-          : L.divIcon({ className: '', html: `<div style="background:${dayColor};width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white">${i+1}</div>`, iconSize:[24,24], iconAnchor:[12,12] });
+        const radius = truck === 'A' ? '50%' : '6px';
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="background:${dayColor};width:24px;height:24px;border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)">${i+1}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
 
         const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
         const dates = [...getWeekDates(0), ...getWeekDates(1)];
@@ -4271,8 +4297,6 @@ function renderDayPills() {
   let html = `<div class="day-pill ${state.activeDayFilter === 'ALL' ? 'active' : ''}" style="${state.activeDayFilter === 'ALL' ? 'background:#f0c93a;border-color:#f0c93a' : ''}" onclick="setDayFilter('ALL')"><span class="pill-day">ALL</span></div>`;
 
   allDays.forEach(({ day, date, key }) => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    if (date < today) return;
     const isActive = state.activeDayFilter === key;
     const dayColor = getDayColor(day, key);
     const activeStyle = isActive ? `background:${dayColor};border-color:${dayColor}` : '';
