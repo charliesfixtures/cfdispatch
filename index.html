@@ -3074,12 +3074,11 @@ function handleTruckDragOver(e, dayKey, truck) {
     }
     // Reject: same truck (handled by stop-level drop)
     if (dragData.dayKey === dayKey && dragData.truck === truck) return;
-    // Reject: full
+    // Visual warning for full truck (but still allow drop for overflow)
     const stops = state.schedule[dayKey]?.[truck] || [];
-    if (stops.length >= 4) {
-      section.classList.add('drop-reject');
-      section.classList.remove('drop-hover');
-      e.dataTransfer.dropEffect = 'none';
+    if (stops.length >= MAX_STOPS) {
+      section.classList.add('drop-hover');
+      section.style.opacity = '0.7'; // dimmed to indicate overflow
       return;
     }
     section.classList.add('drop-hover');
@@ -3149,10 +3148,8 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
       dragData = null;
       return;
     }
-    if (toStops.length >= 4) {
-      showToast(`⚠ ${truck} is full (4 stops max)`, 'warning');
-      dragData = null;
-      return;
+    if (toStops.length >= MAX_STOPS) {
+      showToast(`⚠ Truck ${truck} is over capacity (${toStops.length + 1}/${MAX_STOPS})`, 'warning');
     }
 
     if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
@@ -3199,6 +3196,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
       showToast(`Truck ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
       return;
     }
+    showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — card is nearby, allowed`, 'warning');
   }
 
   // Find best insert position using algo (or use specified position)
