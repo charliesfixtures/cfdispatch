@@ -1459,12 +1459,12 @@ body {
 }
 
 .unscheduled-pin {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: rgba(240,201,58,0.7);
-  border: 2px solid rgba(255,255,255,0.8);
-  box-shadow: 0 0 0 3px rgba(240,201,58,0.2);
+  background: rgba(230,100,80,0.75);
+  border: 2.5px solid rgba(255,255,255,0.9);
+  box-shadow: 0 0 0 3px rgba(230,100,80,0.25);
   cursor: pointer;
   transition: all 0.2s;
   animation: pulseDot 2s infinite;
@@ -1473,21 +1473,21 @@ body {
 .unscheduled-pin.selected {
   width: 20px;
   height: 20px;
-  background: var(--accent);
+  background: rgba(230,100,80,0.9);
   border-color: #fff;
   margin: -3px;
   animation: pulseSelected 1s infinite;
-  box-shadow: 0 0 0 5px rgba(240,201,58,0.25), 0 0 0 10px rgba(240,201,58,0.1);
+  box-shadow: 0 0 0 5px rgba(230,100,80,0.25), 0 0 0 10px rgba(230,100,80,0.1);
 }
 
 @keyframes pulseDot {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(125,139,168,0.4); }
-  50% { box-shadow: 0 0 0 5px rgba(125,139,168,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230,100,80,0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(230,100,80,0); }
 }
 
 @keyframes pulseSelected {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(240,201,58,0.5), 0 0 0 6px rgba(240,201,58,0.2); }
-  50% { box-shadow: 0 0 0 6px rgba(240,201,58,0.3), 0 0 0 12px rgba(240,201,58,0.1); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(230,100,80,0.5), 0 0 0 6px rgba(230,100,80,0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(230,100,80,0.3), 0 0 0 12px rgba(230,100,80,0.1); }
 }
 
 .landmark-pin {
@@ -2259,11 +2259,18 @@ function initMap() {
 }
 
 function addLandmarkPin(loc, color) {
+  // Convert hex to rgba for ring and glow
+  const hex = color.replace('#','');
+  const r = parseInt(hex.substring(0,2),16);
+  const g = parseInt(hex.substring(2,4),16);
+  const b = parseInt(hex.substring(4,6),16);
+  const ringColor = `rgba(${r},${g},${b},0.5)`;
+  const glowColor = `rgba(${r},${g},${b},0.15)`;
   const icon = L.divIcon({
     className: '',
-    html: `<div class="landmark-pin"><div class="landmark-icon" style="background:${color};border-color:${color};padding:3px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.4);"><img src="assets/cf-pin.png" width="28" height="28" style="display:block;border-radius:4px;" /></div></div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    html: `<div class="landmark-pin"><div class="landmark-icon" style="background:rgba(235,230,220,0.7);backdrop-filter:blur(12px) saturate(1.5) brightness(1.1);-webkit-backdrop-filter:blur(12px) saturate(1.5) brightness(1.1);border:2px solid ${ringColor};padding:4px;border-radius:10px;box-shadow:0 0 0 4px ${glowColor}, 0 2px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.5);"><img src="assets/cf-pin.png" width="28" height="28" style="display:block;border-radius:4px;" /></div></div>`,
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   });
   L.marker([loc.lat, loc.lng], { icon, zIndexOffset: -100 })
     .bindTooltip(loc.name, { permanent: false, direction: 'top' })
