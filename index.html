@@ -2924,9 +2924,6 @@ function renderRouteSheet() {
       `<div class="cap-dot ${i < stops.length ? (stops.length > MAX_STOPS ? 'overflow' : 'filled') : ''}"></div>`
     ).join('');
 
-    const driverInfoLines = driver?.driverInfo
-      ? Object.entries(driver.driverInfo).map(([k, v]) => {
-          const icons = { phone: '📞', license: '🪪', vehicle: '🚛', email: '📧' };
     // Build glass tooltip HTML from driver info
     const driverTipRows = driver?.driverInfo
       ? Object.entries(driver.driverInfo).map(([k, v]) => {
