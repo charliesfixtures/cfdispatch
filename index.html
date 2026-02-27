@@ -4141,14 +4141,33 @@ async function loadData() {
 }
 
 async function loadDrivers() {
-  const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&fields=id,name,due,start&limit=50`);
+  const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&checklists=all&fields=id,name,due,start,desc&limit=50`);
   state.drivers = cards.map((c) => {
-    // Parse phone from card description (looks for patterns like 123-456-7890, (123) 456-7890, etc.)
-    const phoneMatch = c.desc?.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4})/);
+    // Parse driver info from "Driver Info" checklist
+    const infoChecklist = c.checklists?.find(cl => cl.name.toLowerCase().includes('driver info'));
+    const checklistData = {};
+    if (infoChecklist) {
+      infoChecklist.checkItems?.forEach(item => {
+        const text = item.name.trim();
+        // Parse "Key: Value" or "Key Value" patterns
+        const colonMatch = text.match(/^([^:]+):\s*(.+)$/);
+        if (colonMatch) {
+          checklistData[colonMatch[1].trim().toLowerCase()] = colonMatch[2].trim();
+        }
+      });
+    }
+
+    // Phone: try checklist first, then description fallback
+    const phone = checklistData.phone || checklistData['phone number'] || checklistData.cell || (() => {
+      const phoneMatch = c.desc?.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4})/);
+      return phoneMatch ? phoneMatch[1].trim() : null;
+    })();
+
     return {
       id: c.id,
       name: c.name,
-      phone: phoneMatch ? phoneMatch[1].trim() : null,
+      phone: phone,
+      driverInfo: checklistData,
       photo: c.attachments?.find(a => a.previews?.length)?.previews?.slice(-1)[0]?.url || null,
       unavailableFrom: c.start || null,
       unavailableUntil: c.due || null,
