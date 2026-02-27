@@ -2101,11 +2101,13 @@ function dueTimestamp(date) {
 // ════════════════════════════════════════════════════════
 // PARSE RS FIELD
 // ════════════════════════════════════════════════════════
-const FLEXIBLE_KEYWORDS = ['asap','flex','flexible','na','n/a','anytime','no preference','none','tbd','open','whenever'];
+const ASAP_KEYWORDS = ['asap','urgent','rush','emergency','stat','critical','now','today','immediately','immed','rn'];
+const FLEXIBLE_KEYWORDS = ['flex','flexible','any','anytime','no preference','no pref','none','tbd','open','whenever','no rush','nr','na','n/a','idc','dont care',"don't care",'whatever','w/e','later','no date','no hurry','nh','np','whenever works','when available','next available','next avail','schedule me','fit me in','no specific'];
 
 function parseRS(val) {
   if (!val || !val.trim()) return { type: 'empty' };
   const v = val.trim().toLowerCase();
+  if (ASAP_KEYWORDS.some(k => v.includes(k))) return { type: 'asap' };
   if (FLEXIBLE_KEYWORDS.some(k => v.includes(k))) return { type: 'flexible' };
 
   // Try to parse as date
@@ -2479,7 +2481,7 @@ function renderMap() {
       if (!card.coords) return;
       const owner = card.requesterName || card.salesperson || 'Unassigned';
       const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">\u{1F464} ${owner}</div><div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
-      const urgency = card.rsValue === 'ASAP' ? 'asap' : 'normal';
+      const urgency = parseRS(card.rsValue).type === 'asap' ? 'asap' : 'normal';
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin(urgency) })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
@@ -2612,8 +2614,10 @@ function buildQueueCard(card) {
   const quadrant = card.quadrant || '';
   const rsInfo = parseRS(card.rsValue);
   let rsDisplay = 'Flexible';
-  if (rsInfo.type === 'date') rsDisplay = rsInfo.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (rsInfo.type === 'asap') rsDisplay = 'ASAP';
+  else if (rsInfo.type === 'date') rsDisplay = rsInfo.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   else if (rsInfo.type === 'past') rsDisplay = '⚠ Past date';
+  else if (rsInfo.type === 'flexible') rsDisplay = 'Flexible';
   else if (card.rsValue && card.rsValue !== '') rsDisplay = card.rsValue;
 
   // Algo strip — show top 2 recommendations with RS context
