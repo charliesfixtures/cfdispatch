@@ -1485,6 +1485,20 @@ body {
   50% { box-shadow: 0 0 0 8px rgba(230,100,80,0); }
 }
 
+/* ASAP urgency — faster pulse, slightly bigger */
+.unscheduled-pin.asap {
+  width: 18px;
+  height: 18px;
+  background: rgba(220,60,40,0.8);
+  border: 2.5px solid rgba(255,255,255,0.95);
+  animation: pulseAsap 1s infinite;
+}
+
+@keyframes pulseAsap {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220,60,40,0.6); }
+  50% { box-shadow: 0 0 0 10px rgba(220,60,40,0); }
+}
+
 @keyframes pulseSelected {
   0%, 100% { box-shadow: 0 0 0 3px rgba(230,100,80,0.5), 0 0 0 6px rgba(230,100,80,0.2); }
   50% { box-shadow: 0 0 0 6px rgba(230,100,80,0.3), 0 0 0 12px rgba(230,100,80,0.1); }
@@ -2327,8 +2341,9 @@ function createDriverPin(driver, stopNum, dayColor) {
   return L.divIcon({ className: '', html, iconSize: [36, 36], iconAnchor: [18, 18] });
 }
 
-function createUnscheduledPin() {
-  return L.divIcon({ className: '', html: '<div class="unscheduled-pin"></div>', iconSize: [10,10], iconAnchor: [5,5] });
+function createUnscheduledPin(urgency) {
+  const cls = urgency === 'asap' ? 'unscheduled-pin asap' : 'unscheduled-pin';
+  return L.divIcon({ className: '', html: `<div class="${cls}"></div>`, iconSize: [10,10], iconAnchor: [5,5] });
 }
 
 // ════════════════════════════════════════════════════════
@@ -2464,7 +2479,8 @@ function renderMap() {
       if (!card.coords) return;
       const owner = card.requesterName || card.salesperson || 'Unassigned';
       const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">\u{1F464} ${owner}</div><div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
-      const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin() })
+      const urgency = card.rsValue === 'ASAP' ? 'asap' : 'normal';
+      const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin(urgency) })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
       marker._cardId = card.id;
