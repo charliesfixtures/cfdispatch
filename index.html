@@ -4272,19 +4272,6 @@ async function loadScheduledCards() {
 // ════════════════════════════════════════════════════════
 // UI HELPERS
 // ════════════════════════════════════════════════════════
-function getNext10WorkingDays() {
-  const days = [];
-  const d = new Date();
-  d.setHours(0,0,0,0);
-  while (days.length < 10) {
-    d.setDate(d.getDate() + 1);
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) {
-      days.push(new Date(d));
-    }
-  }
-  return days;
-}
 
 function renderDayPills() {
   const container = document.getElementById('map-controls');
