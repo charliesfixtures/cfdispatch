@@ -1496,6 +1496,42 @@ body {
   align-items: center;
 }
 
+/* Landmark rich hover tooltip */
+.landmark-tip {
+  background: rgba(235,230,220,0.94) !important;
+  backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
+  border: 1px solid rgba(255,255,255,0.4) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+  padding: 14px 16px !important;
+  font-family: 'Inter Tight', sans-serif;
+  line-height: 1.55;
+}
+.landmark-tip::before { border-right-color: rgba(235,230,220,0.94) !important; }
+.lm-t { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.65); margin-bottom: 5px; }
+.lm-r { font-size: 12px; color: rgba(0,0,0,0.4); margin: 2px 0; }
+.lm-h { font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.06); }
+
+/* Map dot hover tooltip (pending + scheduled) */
+.dot-tip {
+  background: rgba(235,230,220,0.94) !important;
+  backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5) brightness(1.05);
+  border: 1px solid rgba(255,255,255,0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1) !important;
+  padding: 10px 12px !important;
+  font-family: 'Inter Tight', sans-serif;
+  line-height: 1.5;
+}
+.dot-tip::before { border-right-color: rgba(235,230,220,0.94) !important; }
+.dt-name { font-size: 12px; font-weight: 700; color: rgba(0,0,0,0.65); margin-bottom: 2px; }
+.dt-owner { font-size: 10.5px; color: rgba(0,0,0,0.4); }
+.dt-status { font-size: 10px; margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(0,0,0,0.06); }
+.dt-pending { color: rgba(230,100,80,0.7); font-weight: 600; }
+.dt-scheduled { color: rgba(76,155,60,0.8); font-weight: 600; }
+
 .landmark-icon {
   width: 30px;
   height: 30px;
@@ -1870,8 +1906,13 @@ const CUSTOM_FIELDS = {
   OT:        '69839631a61d2fa52d6c0699',
 };
 
-const FRUITLAND = { lat: 33.9989, lng: -118.2054, name: 'Fruitland Warehouse' };
-const HQ = { lat: 34.043654, lng: -118.307807, name: "Charlie's HQ" };
+const FRUITLAND = { lat: 33.9989, lng: -118.2054, name: 'CF Fruitland' };
+const HQ = { lat: 34.043654, lng: -118.307807, name: "CF Venice" };
+
+const LANDMARK_INFO = {
+  'CF Venice': `<div class="lm-t">Charlie's Fixtures</div><div class="lm-r">2251 Venice Blvd., Los Angeles CA 90006</div><div class="lm-r">📞 323-731-9023</div><div class="lm-h">🕐 Mon–Fri 8am–5pm · Sat 8am–4pm</div>`,
+  'CF Fruitland': `<div class="lm-t">Fruitland Warehouse</div><div class="lm-r">3063 E. Fruitland Ave., Vernon CA 90059</div><div class="lm-r">📞 323-584-6122</div><div class="lm-h">🕐 Mon–Fri 8am–1pm &amp; 1:30pm–4:30pm</div>`
+};
 
 const DAY_COLORS = {
   MON: '#f0c93a', TUE: '#4f8eff', WED: '#7ed6a0',
@@ -2273,7 +2314,7 @@ function addLandmarkPin(loc, color) {
     iconAnchor: [21, 21],
   });
   L.marker([loc.lat, loc.lng], { icon, zIndexOffset: -100 })
-    .bindTooltip(loc.name, { permanent: false, direction: 'top' })
+    .bindTooltip(LANDMARK_INFO[loc.name] || loc.name, { permanent: false, direction: 'right', offset: [18, 0], className: 'landmark-tip', interactive: false })
     .addTo(map);
 }
 
@@ -2397,8 +2438,14 @@ function renderMap() {
           ? createDriverPin(driver, i + 1, dayColor)
           : L.divIcon({ className: '', html: `<div style="background:${dayColor};width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white">${i+1}</div>`, iconSize:[24,24], iconAnchor:[12,12] });
 
+        const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
+        const schedDay = dayNames[key.split('-')[0]] || key;
+        const stopOwner = stop.salesperson || 'Unassigned';
+        const committed = stop.committed ? 'Committed' : 'Staged';
+        const stopTipHtml = `<div class="dt-name">${stop.name}</div><div class="dt-owner">👤 ${stopOwner}</div><div class="dt-status"><span class="dt-scheduled">● ${committed} · ${schedDay} · Truck ${truck}</span></div>`;
+
         const marker = L.marker([stop.coords.lat, stop.coords.lng], { icon })
-          .bindPopup(buildPopupHTML(stop))
+          .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
           .addTo(map);
 
         if (!state.mapMarkers[key]) state.mapMarkers[key] = [];
@@ -2411,8 +2458,10 @@ function renderMap() {
   if (activeFilter === 'ALL' || !activeFilter) {
     state.queueCards.forEach((card, idx) => {
       if (!card.coords) return;
+      const owner = card.salesperson || 'Unassigned';
+      const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">👤 ${owner}</div><div class="dt-status"><span class="dt-pending">● Pending</span></div>`;
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin() })
-        .bindPopup(buildQueuePopupHTML(card), { maxWidth: 260, minWidth: 220 })
+        .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
       marker._cardId = card.id;
       state.unscheduledMarkers.push(marker);
