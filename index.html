@@ -2530,9 +2530,8 @@ function renderMap() {
     }
   }
 
-  // Unscheduled dots
-  if (activeFilter === 'ALL' || !activeFilter) {
-    state.queueCards.forEach((card, idx) => {
+  // Unscheduled dots — always visible so manager can see pending cards alongside any day's routes
+  state.queueCards.forEach((card, idx) => {
       if (!card.coords) return;
       const owner = card.requesterName || card.salesperson || 'Unassigned';
       const tipHtml = `<div class="dt-name">${card.name}</div><div class="dt-owner">\u{1F464} ${owner}</div><div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
@@ -2543,7 +2542,6 @@ function renderMap() {
       marker._cardId = card.id;
       state.unscheduledMarkers.push(marker);
     });
-  }
   updateRouteAnimation();
 }
 
