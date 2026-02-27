@@ -2481,7 +2481,7 @@ function renderMap() {
 
       // Route line — Truck B gets lighter opacity to differentiate
       const truckOpacity = 0.75;
-      const truckWeight = truck === 'A' ? 1.5 : 2.5;
+      const truckWeight = truck === 'A' ? 1 : 1.5;
       const truckDash = truck === 'A' ? '10 6' : '2 6';
       const line = L.polyline(
         routePoints.map(p => [p.lat, p.lng]),
