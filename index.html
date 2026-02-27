@@ -906,18 +906,18 @@ body {
 
 /* ── STAGED STOP (dragged but not committed) ── */
 .stop-item.staged {
-  border: 1.5px solid rgba(240,201,58,0.6);
+  border: 1.5px solid color-mix(in srgb, var(--day-color, #f0c93a) 60%, transparent);
   border-radius: 10px;
   margin: 4px 6px;
   padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(240,201,58,0.18) 0%, rgba(240,201,58,0.08) 100%);
-  box-shadow: 0 2px 12px rgba(240,201,58,0.12), inset 0 1px 0 rgba(255,255,255,0.4);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--day-color, #f0c93a) 18%, transparent) 0%, color-mix(in srgb, var(--day-color, #f0c93a) 8%, transparent) 100%);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--day-color, #f0c93a) 12%, transparent), inset 0 1px 0 rgba(255,255,255,0.4);
 }
 
 .stop-item.staged .stop-num {
-  background: rgba(240,201,58,0.35);
-  border-color: rgba(200,160,20,0.4);
-  color: rgba(100,70,0,0.85);
+  background: color-mix(in srgb, var(--day-color, #f0c93a) 35%, transparent);
+  border-color: color-mix(in srgb, var(--day-color, #f0c93a) 40%, transparent);
+  color: rgba(0,0,0,0.65);
   font-weight: 700;
 }
 
@@ -2735,8 +2735,9 @@ function buildQueueCard(card) {
 
     if (recs.length > 0 && recs[0].routesFull) {
       const dateStr = recs[0].nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const nextDayColor = getDayColor(recs[0].nextAvailableDate.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase().slice(0,3), '');
       algoStrip = `<div class="algo-strip" style="background:rgba(180,130,40,0.06)">
-        <span class="algo-icon" style="opacity:0.7">⏳</span>
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${nextDayColor};flex-shrink:0"></span>
         <span style="color:rgba(160,110,30,0.65);font-weight:600;font-size:11px;font-family:'Inter Tight',sans-serif">Routes full</span>
         <span style="color:rgba(160,110,30,0.45);font-size:10.5px;font-family:'Inter Tight',sans-serif">· Next opening ${dateStr}</span>
       </div>`;
@@ -2745,13 +2746,14 @@ function buildQueueCard(card) {
       const best = recs[0];
       const dateStr = best.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       const color = algoColor(best.colorScore);
+      const dayColor = getDayColor(best.dayKey.split('-')[0], best.dayKey);
       const prefLabel = best.isPreferredDay ? '<span style="font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
       const riderMatch = (card.rider && best.isInRouteMatch) ? '<span style="color:rgba(100,80,180,0.8);font-size:9px;font-weight:700;margin-left:4px">🏷 IN-ROUTE</span>' : '';
 
       algoStrip = `<div class="algo-strip" 
         onmouseenter="showRoutePreview('${card.id}','${best.dayKey}','${best.truck}',${best.insertPos})"
         onmouseleave="clearRoutePreview()"
-        style="cursor:pointer">
+        style="cursor:pointer;border-left:3px solid ${dayColor}">
         <span class="algo-icon">✦</span>
         <span style="color:${color};font-weight:700;font-size:11px;font-family:'Inter Tight',sans-serif">${dateStr}</span>
         ${prefLabel}${riderMatch}
@@ -2762,8 +2764,9 @@ function buildQueueCard(card) {
         const alt = recs[1];
         const altDateStr = alt.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         const altColor = algoColor(alt.colorScore);
+        const altDayColor = getDayColor(alt.dayKey.split('-')[0], alt.dayKey);
         const altPref = alt.isPreferredDay ? ' ★' : '';
-        algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px;cursor:pointer"
+        algoStrip += `<div class="algo-strip" style="opacity:0.6;margin-top:3px;padding:4px 9px;cursor:pointer;border-left:3px solid ${altDayColor}"
           onmouseenter="showRoutePreview('${card.id}','${alt.dayKey}','${alt.truck}',${alt.insertPos})"
           onmouseleave="clearRoutePreview()">
           <span class="algo-icon" style="font-size:9px">○</span>
@@ -2927,7 +2930,9 @@ function renderRouteSheet() {
           stop.equipRemoval && '<span class="stop-flag flag-remove">RM</span>',
         ].filter(Boolean).join('');
 
+        const stopDayColor = getDayColor(key.split('-')[0], key);
         html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
+          ${isStaged ? `style="--day-color:${stopDayColor}"` : ''}
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
