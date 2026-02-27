@@ -1527,6 +1527,21 @@ body {
 .lm-r { font-size: 12px; color: rgba(0,0,0,0.4); margin: 2px 0; }
 .lm-h { font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.06); }
 
+/* Route line animation — marching dashes show direction of travel */
+@keyframes flowDash {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -24; }
+}
+.route-line {
+  /* Static by default — animation applied via .route-animate */
+}
+.route-line.route-animate {
+  animation: flowDash 0.8s linear infinite;
+}
+.route-line.route-dim {
+  opacity: 0.2 !important;
+}
+
 /* Map dot hover tooltip (pending + scheduled) */
 .dot-tip {
   background: rgba(235,230,220,0.94) !important;
@@ -2443,8 +2458,11 @@ function renderMap() {
           opacity: 0.6,
           dashArray: weekNum === 2 ? '8 4' : '6 3',
           smoothFactor: 2,
+          className: `route-line route-${key}-${truck}`,
         }
       ).addTo(map);
+      line._routeKey = key;
+      line._routeTruck = truck;
 
       if (!state.mapRouteLines[key]) state.mapRouteLines[key] = [];
       state.mapRouteLines[key].push(line);
@@ -2487,6 +2505,57 @@ function renderMap() {
         .addTo(map);
       marker._cardId = card.id;
       state.unscheduledMarkers.push(marker);
+    });
+  }
+  updateRouteAnimation();
+}
+
+// ── ROUTE ANIMATION CONTROL ──
+// Determines which route lines animate based on current view state:
+// ALL + no selection → all animate
+// ALL + card selected → only that card's route animates, others dim
+// Day + no selection → all routes for that day animate
+// Day + card selected → only that card's route animates, others dim
+function updateRouteAnimation() {
+  const activeFilter = state.activeDayFilter;
+  const selectedCard = state.selectedCard;
+
+  // Find which route the selected card is on (if scheduled)
+  let selectedRouteKey = null;
+  let selectedRouteTruck = null;
+  if (selectedCard) {
+    for (const [key, daySchedule] of Object.entries(state.schedule)) {
+      for (const [truck, stops] of Object.entries(daySchedule)) {
+        if (stops.some(s => s.cardId === selectedCard.id || s.id === selectedCard.id)) {
+          selectedRouteKey = key;
+          selectedRouteTruck = truck;
+          break;
+        }
+      }
+      if (selectedRouteKey) break;
+    }
+  }
+
+  // Apply animation classes to all route lines
+  for (const [key, lines] of Object.entries(state.mapRouteLines)) {
+    lines.forEach(line => {
+      const el = line.getElement?.();
+      if (!el) return;
+
+      // Reset classes
+      el.classList.remove('route-animate', 'route-dim');
+
+      if (selectedCard && selectedRouteKey) {
+        // Card is selected AND it's on a route
+        if (line._routeKey === selectedRouteKey && line._routeTruck === selectedRouteTruck) {
+          el.classList.add('route-animate');
+        } else {
+          el.classList.add('route-dim');
+        }
+      } else {
+        // No card selected (or card is still pending) — animate all visible routes
+        el.classList.add('route-animate');
+      }
     });
   }
 }
@@ -2940,6 +3009,7 @@ function toggleExpandCard(cardId) {
   });
 
   renderQueue();
+  updateRouteAnimation();
 }
 
 function dragQueueCard(e, cardId) {
