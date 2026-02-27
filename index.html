@@ -1068,14 +1068,66 @@ body {
 
 /* ── COMMITTED STOP ── */
 .stop-item.committed {
-  border-left: 3px solid var(--success);
-  background: rgba(110,207,150,0.04);
+  border-left: 3px solid transparent;
+  background: none;
 }
 
 .stop-item.committed .stop-num {
+  display: none; /* Hidden — replaced by PFP */
+}
+
+/* Committed card: PFP replaces stop number */
+.committed-pfp-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+}
+.committed-pfp-wrap img {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--success);
+}
+.committed-stop-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  min-width: 15px; height: 15px;
+  border-radius: 8px;
+  background: var(--success);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #fff;
+  font-family: 'Inter Tight', sans-serif;
+  padding: 0 3px;
+}
+.committed-stop-badge.first-stop {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  min-width: 20px; height: 20px;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 0 4px;
+  bottom: -4px;
+  right: -6px;
+  box-shadow: 0 1px 4px rgba(217,119,6,0.4);
+}
+/* Fallback when no PFP — show a green checkmark circle */
+.committed-pfp-fallback {
+  width: 34px; height: 34px;
+  border-radius: 50%;
   background: rgba(110,207,150,0.12);
-  border-color: rgba(110,207,150,0.3);
-  color: rgba(40,120,70,0.7);
+  border: 2px solid var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--success);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 /* ── DRIVER PICKER ── */
@@ -2730,7 +2782,7 @@ function renderQueue() {
 function buildQueueCard(card) {
   const isSelected = state.selectedCard?.id === card.id;
   const isExpanded = state.expandedCard === card.id;
-  const warningClass = (!card.address || !card.coords) ? 'has-warning' : '';
+  const warningClass = (!card.address || !card.coords) ? 'has-warning' : (!card.requesterName ? 'has-warning' : '');
 
   // Avatar (card owner / salesperson)
   let avatarHtml = '';
@@ -2757,6 +2809,11 @@ function buildQueueCard(card) {
     algoStrip = `<div class="algo-strip" style="background:rgba(200,100,50,0.06)">
       <span class="algo-icon" style="opacity:0.8">⚠</span>
       <span style="color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Address required for routing</span>
+    </div>`;
+  } else if (!card.requesterName) {
+    algoStrip = `<div class="algo-strip" style="background:rgba(200,100,50,0.06)">
+      <span class="algo-icon" style="opacity:0.8">⚠</span>
+      <span style="color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Owner required — assign member in Trello</span>
     </div>`;
   } else {
     const recs = recommendMultiple(card, 3);
@@ -2982,13 +3039,26 @@ function renderRouteSheet() {
         ].filter(Boolean).join('');
 
         const stopDayColor = getDayColor(key.split('-')[0], key);
+        const isFirstStop = stop.firstStopApproved && i === 0;
+        const committedPfpHtml = isCommitted
+          ? (stop.requesterAvatar
+            ? `<div class="committed-pfp-wrap" title="Drag to reorder">
+                <img src="${stop.requesterAvatar}" onerror="this.style.background='var(--success)'" />
+                <div class="committed-stop-badge ${isFirstStop ? 'first-stop' : ''}">${isFirstStop ? '★' + (i+1) : (i+1)}</div>
+              </div>`
+            : `<div class="committed-pfp-wrap" title="Drag to reorder">
+                <div class="committed-pfp-fallback">✓</div>
+                <div class="committed-stop-badge ${isFirstStop ? 'first-stop' : ''}">${isFirstStop ? '★' + (i+1) : (i+1)}</div>
+              </div>`)
+          : '';
+
         html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
           ${isStaged ? `style="--day-color:${stopDayColor}"` : ''}
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
           ondrop="dropStop(event,'${key}','${truck}',${i});this.style.background=''">
-          <div class="stop-num" title="Drag to reorder">⠿ ${i+1}</div>
+          ${isCommitted ? committedPfpHtml : `<div class="stop-num" title="Drag to reorder">⠿ ${i+1}</div>`}
           <div class="stop-content">
             <div class="stop-name">${stop.cardName || stop.name}</div>
             <div class="stop-meta">
@@ -2996,8 +3066,6 @@ function renderRouteSheet() {
               ${flags}
             </div>
           </div>
-          ${isCommitted && stop.requesterAvatar ? `<img src="${stop.requesterAvatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid var(--success);flex-shrink:0" title="${stop.requesterName || 'Salesperson'}" />` : ''}
-          ${isCommitted && !stop.requesterAvatar ? '<span style="font-size:10px;color:var(--success);font-weight:600;font-family:Inter Tight,sans-serif;flex-shrink:0">✓</span>' : ''}
           <div class="stop-actions">
             ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
             ${isCommitted ? `<button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit details">✎</button>` : ''}
@@ -3235,6 +3303,12 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   // Reject: no address
   if (!card.coords) {
     showToast('⚠ Address required — cannot schedule this card', 'error');
+    return;
+  }
+
+  // Reject: no owner
+  if (!card.requesterName) {
+    showToast('⚠ Owner required — assign a member in Trello first', 'error');
     return;
   }
 
