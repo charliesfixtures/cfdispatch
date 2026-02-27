@@ -2900,17 +2900,24 @@ function renderRouteSheet() {
       `<div class="cap-dot ${i < stops.length ? (stops.length > MAX_STOPS ? 'overflow' : 'filled') : ''}"></div>`
     ).join('');
 
-    const driverPhoneTitle = driver
-      ? `${driverName}${driver.phone ? '\n📞 ' + driver.phone : ''}\nClick to change driver`
+    const driverInfoLines = driver?.driverInfo
+      ? Object.entries(driver.driverInfo).map(([k, v]) => {
+          const icons = { phone: '📞', license: '🪪', vehicle: '🚛', email: '📧' };
+          const icon = icons[k] || '•';
+          return `${icon} ${v}`;
+        }).join('\n')
+      : '';
+    const driverTooltip = driver
+      ? `${driverName}${driverInfoLines ? '\n' + driverInfoLines : ''}\nClick to change driver`
       : 'Assign a driver';
 
     // Avatar HTML — either assigned driver photo or placeholder
     const avatarHTML = driver
-      ? `<div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverPhoneTitle}">
+      ? `<div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverTooltip}">
           <img class="truck-driver-img" src="${driverImg}" onerror="this.style.background='#2e3850';this.src=''" alt="${driverName}" />
           ${isUnavailable ? '<div class="driver-unavail-badge">!</div>' : ''}
         </div>`
-      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverPhoneTitle}">
+      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="${driverTooltip}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>`;
 
