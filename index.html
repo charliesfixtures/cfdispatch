@@ -1086,7 +1086,7 @@ body {
   width: 34px; height: 34px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--success);
+  border: 2px solid var(--day-color, #999);
 }
 .committed-stop-badge {
   position: absolute;
@@ -1094,40 +1094,51 @@ body {
   right: -4px;
   min-width: 15px; height: 15px;
   border-radius: 8px;
-  background: var(--success);
-  color: #fff;
+  background: rgba(245,243,238,0.95);
+  color: rgba(0,0,0,0.45);
   font-size: 8px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #fff;
+  border: 1px solid rgba(0,0,0,0.08);
   font-family: 'Inter Tight', sans-serif;
   padding: 0 3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-.committed-stop-badge.first-stop {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  min-width: 20px; height: 20px;
-  font-size: 9px;
-  font-weight: 900;
-  padding: 0 4px;
-  bottom: -4px;
-  right: -6px;
-  box-shadow: 0 1px 4px rgba(217,119,6,0.4);
+/* Crown for first stop — top-left of PFP */
+.committed-crown {
+  position: absolute;
+  top: -8px;
+  left: -4px;
+  font-size: 14px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15));
+  z-index: 2;
+  line-height: 1;
 }
-/* Fallback when no PFP — show a green checkmark circle */
+/* Fallback when no PFP — show a checkmark circle */
 .committed-pfp-fallback {
   width: 34px; height: 34px;
   border-radius: 50%;
-  background: rgba(110,207,150,0.12);
-  border: 2px solid var(--success);
+  background: rgba(0,0,0,0.03);
+  border: 2px solid var(--day-color, #999);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--success);
+  color: rgba(0,0,0,0.3);
   font-size: 14px;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+/* Staged card: pulsing stop number */
+@keyframes stagePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.92); }
+}
+.stop-item.staged .stop-num {
+  animation: stagePulse 2s ease-in-out infinite;
+}
 }
 
 /* ── DRIVER PICKER ── */
@@ -3040,20 +3051,24 @@ function renderRouteSheet() {
 
         const stopDayColor = getDayColor(key.split('-')[0], key);
         const isFirstStop = stop.firstStopApproved && i === 0;
+        const crownHtml = isFirstStop ? '<div class="committed-crown">👑</div>' : '';
         const committedPfpHtml = isCommitted
           ? (stop.requesterAvatar
-            ? `<div class="committed-pfp-wrap" title="Drag to reorder">
-                <img src="${stop.requesterAvatar}" onerror="this.style.background='var(--success)'" />
-                <div class="committed-stop-badge ${isFirstStop ? 'first-stop' : ''}">${isFirstStop ? '★' + (i+1) : (i+1)}</div>
+            ? `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor}">
+                ${crownHtml}
+                <img src="${stop.requesterAvatar}" onerror="this.style.background='#ddd'" />
+                <div class="committed-stop-badge">${i+1}</div>
               </div>`
-            : `<div class="committed-pfp-wrap" title="Drag to reorder">
+            : `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor}">
+                ${crownHtml}
                 <div class="committed-pfp-fallback">✓</div>
-                <div class="committed-stop-badge ${isFirstStop ? 'first-stop' : ''}">${isFirstStop ? '★' + (i+1) : (i+1)}</div>
+                <div class="committed-stop-badge">${i+1}</div>
               </div>`)
           : '';
 
         html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
           ${isStaged ? `style="--day-color:${stopDayColor}"` : ''}
+          ${isCommitted ? `style="--day-color:${stopDayColor}"` : ''}
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
