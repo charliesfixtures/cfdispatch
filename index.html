@@ -3058,7 +3058,7 @@ function renderRouteSheet() {
         ].filter(Boolean).join('');
 
         const stopDayColor = getDayColor(key.split('-')[0], key);
-        const isFirstStop = !!(stop.firstStopApproved || stop.firstStopRequested);
+        const isFirstStop = isCommitted && i === 0;
         const crownHtml = isFirstStop ? '<div class="committed-crown">👑</div>' : '';
         const committedPfpHtml = isCommitted
           ? (stop.requesterAvatar
