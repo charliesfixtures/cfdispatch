@@ -4037,10 +4037,18 @@ function openDriverPicker(dayKey, truck, anchorEl) {
   picker.className = 'driver-picker';
   picker.id = 'active-driver-picker';
 
-  // Position near the anchor
+  // Position near the anchor, clamped to viewport
   const rect = anchorEl.getBoundingClientRect();
+  const pickerWidth = 220;
+  let left = rect.left;
+  // If it would overflow right side, align to right edge of anchor
+  if (left + pickerWidth > window.innerWidth) {
+    left = rect.right - pickerWidth;
+  }
+  // Final clamp
+  left = Math.max(8, Math.min(left, window.innerWidth - pickerWidth - 8));
   picker.style.top = `${rect.bottom + 6}px`;
-  picker.style.left = `${rect.left}px`;
+  picker.style.left = `${left}px`;
 
   let html = `<div class="driver-picker-title">Assign driver · Route ${truck}</div>`;
 
