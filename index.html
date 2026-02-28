@@ -1109,12 +1109,13 @@ body {
 /* Crown for first stop — top-left of PFP */
 .committed-crown {
   position: absolute;
-  top: -8px;
-  left: -4px;
-  font-size: 14px;
+  top: -10px;
+  left: -6px;
+  font-size: 15px;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15));
   z-index: 2;
   line-height: 1;
+  transform: rotate(-18deg);
 }
 /* Fallback when no PFP — show a checkmark circle */
 .committed-pfp-fallback {
@@ -2816,16 +2817,23 @@ function buildQueueCard(card) {
 
   // Algo strip — show top 2 recommendations with RS context
   let algoStrip = '';
+  const warningStyle = 'background:rgba(200,100,50,0.06)';
+  const warningTextStyle = 'color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:Inter Tight,sans-serif';
+  let warnings = '';
   if (!card.coords) {
-    algoStrip = `<div class="algo-strip" style="background:rgba(200,100,50,0.06)">
+    warnings += `<div class="algo-strip" style="${warningStyle}">
       <span class="algo-icon" style="opacity:0.8">⚠</span>
-      <span style="color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Address required for routing</span>
+      <span style="${warningTextStyle}">Address required for routing</span>
     </div>`;
-  } else if (!card.requesterName) {
-    algoStrip = `<div class="algo-strip" style="background:rgba(200,100,50,0.06)">
+  }
+  if (!card.requesterName) {
+    warnings += `<div class="algo-strip" style="${warningStyle}">
       <span class="algo-icon" style="opacity:0.8">⚠</span>
-      <span style="color:rgba(180,90,40,0.6);font-weight:500;font-size:11px;font-family:'Inter Tight',sans-serif">Owner required — assign member in Trello</span>
+      <span style="${warningTextStyle}">Owner required — assign member in Trello</span>
     </div>`;
+  }
+  if (warnings) {
+    algoStrip = warnings;
   } else {
     const recs = recommendMultiple(card, 3);
     const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
@@ -3050,7 +3058,7 @@ function renderRouteSheet() {
         ].filter(Boolean).join('');
 
         const stopDayColor = getDayColor(key.split('-')[0], key);
-        const isFirstStop = stop.firstStopApproved && i === 0;
+        const isFirstStop = !!(stop.firstStopApproved || stop.firstStopRequested);
         const crownHtml = isFirstStop ? '<div class="committed-crown">👑</div>' : '';
         const committedPfpHtml = isCommitted
           ? (stop.requesterAvatar
