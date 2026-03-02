@@ -581,6 +581,17 @@ body {
 .route-day-info { flex: 1; padding-left: 4px; }
 .route-day-name { font-size: 16px; font-weight: 600; color: rgba(0,0,0,0.6); font-family: 'Inter Tight', sans-serif; }
 .route-day-meta { display: none; }
+.staged-count-badge {
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.08);
+  color: rgba(0,0,0,0.45);
+  font-size: 10px;
+  font-family: 'Inter Tight', sans-serif;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.staged-count-badge.has-staged { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.55); }
 
 .route-panel {
   overflow-y: auto;
@@ -2970,12 +2981,17 @@ function renderRouteSheet() {
   const weekLabel = key.includes('W2') ? 'WK2' : 'WK1';
   const totalStops = Object.values(state.schedule[key] || {}).flat().length;
 
+  // Count staged (uncommitted) stops across all routes for this day
+  const stagedCount = Object.values(state.schedule[key] || {}).flat().filter(s => !s.committed).length;
+  const stagedBadgeHtml = `<span class="staged-count-badge${stagedCount > 0 ? ' has-staged' : ''}">${stagedCount}</span>`;
+
   let html = `<div class="route-day-header">
     <div class="route-day-dot" style="background:${dayColor}"></div>
     <div class="route-day-info">
       <div class="route-day-name">${dateLabel}</div>
       <div class="route-day-meta">${weekLabel} \u00b7 ${totalStops} stop${totalStops !== 1 ? 's' : ''}</div>
     </div>
+    ${stagedBadgeHtml}
   </div>`;
 
   const trucksToRender = ['A'];
