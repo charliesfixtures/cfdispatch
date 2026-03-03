@@ -1797,7 +1797,7 @@ body {
 const API_KEY = 'TRELLO_API_KEY_PLACEHOLDER';
 let TOKEN = localStorage.getItem('cf_dispatch_token') || 'TRELLO_TOKEN_PLACEHOLDER';
 
-const BOARD_ID = 'GpVORoMM';
+const BOARD_ID = '699600604764a1cd3d99dba1'; // TEST BOARD — swap back to 'GpVORoMM' for production launch
 const HIDDEN_BOARD_ID = '6965633f4fe5254c47e38527';
 const DRIVERS_LIST_ID = '699df279600f35c809d451af';
 
@@ -1836,11 +1836,58 @@ const OVERFLOW_RADIUS_MILES = 2;
 const AWAY_WARNING_DAYS = 10;
 
 // ════════════════════════════════════════════════════════
+// SHARED HELPERS (Session 19 — standardized across all drag/drop paths)
+// ════════════════════════════════════════════════════════
+
+// Convert a stop object back to a queue card — canonical field list
+// Used by: removeStop, handleQueueDrop, toggleTruckLock (lock-bounce)
+function stopToQueueCard(stop) {
+  return {
+    id: stop.cardId || stop.id,
+    shortLink: stop.shortLink,
+    name: stop.cardName || stop.name,
+    address: stop.address,
+    coords: stop.coords,
+    quadrant: stop.quadrant,
+    invTotal: stop.invTotal,
+    customerName: stop.customerName,
+    customerPhone: stop.customerPhone,
+    requesterName: stop.requesterName,
+    requesterAvatar: stop.requesterAvatar,
+    rsValue: stop.rsValue,
+    firstStopRequested: stop.firstStopRequested,
+    whiteGlove: stop.whiteGlove,
+    equipRemoval: stop.equipRemoval,
+    stairs: stop.stairs,
+    dropoff: stop.dropoff,
+    deliveryNotes: stop.deliveryNotes,
+    rider: stop.rider,
+  };
+}
+
+// Check if a route can accept another stop (overflow = nearby allowed)
+// Returns { allowed: bool, overflow: bool }
+function checkOverflowAllowed(stops, cardCoords) {
+  if (!stops || stops.length < MAX_STOPS) return { allowed: true, overflow: false };
+  if (!cardCoords) return { allowed: false, overflow: true };
+  const minDist = stops.reduce((min, s) =>
+    s.coords ? Math.min(min, distanceMiles(cardCoords, s.coords)) : min, Infinity);
+  if (minDist > OVERFLOW_RADIUS_MILES) return { allowed: false, overflow: true };
+  return { allowed: true, overflow: true };
+}
+
+// Single lock check — kills dead state[`lock-...`] pattern
+function isRouteLocked(dayKey, truck) {
+  const truckKey = `${dayKey}-${truck}`;
+  return !!state.lockedTrucks?.[truckKey];
+}
+
+// ════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════
 let state = {
   drivers: [],           // [{id, name, photo, truckDefault, unavailableFrom, unavailableUntil}]
-  queueCards: [],        // unscheduled cards from "Requested for Schedule"
+  queueCards: [],        // unscheduled cards from "RFS" list
   schedule: {},          // { 'MON-W1': { A: [...stops], B: [...stops], C: [...stops] } }
   selectedCard: null,
   activeDayFilter: 'ALL',
@@ -2956,7 +3003,7 @@ function handleTruckDragOver(e, dayKey, truck) {
   // Accept stop-to-stop drags (cross-truck reorder)
   if (dragData) {
     // Reject: locked truck
-    if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
+    if (isRouteLocked(dayKey, truck)) {
       section.classList.add('drop-reject');
       section.classList.remove('drop-hover');
       e.dataTransfer.dropEffect = 'none';
@@ -2992,7 +3039,7 @@ function handleTruckDragOver(e, dayKey, truck) {
   }
 
   // Reject: locked truck
-  if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
+  if (isRouteLocked(dayKey, truck)) {
     section.classList.add('drop-reject');
     section.classList.remove('drop-hover');
     e.dataTransfer.dropEffect = 'none';
@@ -3035,19 +3082,34 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     if (!fromStops) { dragData = null; return; }
 
     const truckKey = `${dayKey}-${truck}`;
-    if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
-      showToast(`🔒 ${truck} is locked`, 'warning');
+    if (isRouteLocked(dayKey, truck)) {
+      showToast(`🔒 Route ${truck} is locked`, 'warning');
       dragData = null;
       return;
     }
+
+    // Check overflow — same logic as queue→route (Bug 2 fix)
+    const movedStop = fromStops[fromIdx];
+    const ofCheck = checkOverflowAllowed(toStops, movedStop?.coords);
     if (toStops.length >= MAX_STOPS) {
-      showToast(`⚠ Route ${truck} is over capacity (${toStops.length + 1}/${MAX_STOPS})`, 'warning');
+      if (!ofCheck.allowed) {
+        showToast(`Route ${truck} is full (${MAX_STOPS} stops) — too far for overflow`, 'error');
+        dragData = null;
+        return;
+      }
+      showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
     }
 
     if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
     if (!state.schedule[dayKey][truck]) state.schedule[dayKey][truck] = [];
 
     const [moved] = fromStops.splice(fromIdx, 1);
+
+    // Committed stop cross-truck warning (Bug 3 fix)
+    if (moved.committed) {
+      showToast(`↔ Committed stop moved to Route ${truck} — Trello comment unchanged`, 'info');
+    }
+
     const toPos = typeof insertAtIdx === 'number' ? insertAtIdx : state.schedule[dayKey][truck].length;
     state.schedule[dayKey][truck].splice(toPos, 0, moved);
     dragData = null;
@@ -3081,7 +3143,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   }
 
   // Reject: locked
-  if (state.lockedTrucks?.[truckKey] || state[`lock-${dayKey}-${truck}`]) {
+  if (isRouteLocked(dayKey, truck)) {
     showToast('🔒 Route is locked — unlock to add stops', 'error');
     return;
   }
@@ -3333,17 +3395,55 @@ function confirmAssign() {
 }
 
 function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
+  // Validation gates — same checks as drag-and-drop (Bug 7 fix)
+  if (isRouteLocked(dayKey, truck)) {
+    showToast('🔒 Route ' + truck + ' is locked — unlock to schedule', 'error');
+    return;
+  }
+  if (!card.requesterName) {
+    showToast('⚠ Owner required — assign a member in Trello first', 'error');
+    return;
+  }
+  var existingStops = state.schedule[dayKey]?.[truck] || [];
+  var ofCheck = checkOverflowAllowed(existingStops, card.coords);
+  if (existingStops.length >= MAX_STOPS) {
+    if (!ofCheck.allowed) {
+      showToast('Route ' + truck + ' is full (' + MAX_STOPS + ' stops) — card too far for overflow', 'error');
+      return;
+    }
+    showToast('⚠ Over capacity (' + (existingStops.length + 1) + '/' + MAX_STOPS + ') — nearby, allowed', 'warning');
+  }
+
   if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
   if (!state.schedule[dayKey][truck]) state.schedule[dayKey][truck] = [];
 
   const stop = {
-    ...card,
+    id: card.id,
+    cardId: card.id,
+    shortLink: card.shortLink,
+    name: card.name,
     cardName: card.name,
-    dayKey,
-    truck,
+    address: card.address,
+    coords: card.coords,
+    quadrant: card.quadrant,
+    invTotal: card.invTotal,
+    customerName: card.customerName,
+    customerPhone: card.customerPhone,
+    requesterName: card.requesterName,
+    requesterAvatar: card.requesterAvatar,
+    rsValue: card.rsValue,
+    firstStopRequested: card.firstStopRequested,
     firstStopApproved: firstStopStatus === 'approved',
     firstStopRevoked: firstStopStatus === 'revoked',
-    pendingCommit: true,
+    whiteGlove: card.whiteGlove,
+    equipRemoval: card.equipRemoval,
+    stairs: card.stairs,
+    dropoff: card.dropoff,
+    deliveryNotes: card.deliveryNotes,
+    rider: card.rider,
+    committed: false,
+    stagedAt: Date.now(),
+    stagedBy: state.currentUser || '',
   };
 
   // Handle first stop lock
@@ -3413,24 +3513,7 @@ function removeStop(dayKey, truck, idx) {
   // Staged (uncommitted) — instant removal, no dialog
   if (!stop.committed) {
     state.schedule[dayKey][truck].splice(idx, 1);
-    state.queueCards.unshift({
-      id: stop.cardId || stop.id,
-      shortLink: stop.shortLink,
-      name: stop.cardName || stop.name,
-      address: stop.address,
-      coords: stop.coords,
-      quadrant: stop.quadrant,
-      invTotal: stop.invTotal,
-      customerName: stop.customerName,
-      customerPhone: stop.customerPhone,
-      firstStopRequested: stop.firstStopRequested,
-      whiteGlove: stop.whiteGlove,
-      equipRemoval: stop.equipRemoval,
-      stairs: stop.stairs,
-      dropoff: stop.dropoff,
-      deliveryNotes: stop.deliveryNotes,
-      rider: stop.rider,
-    });
+    state.queueCards.unshift(stopToQueueCard(stop));
     renderQueue();
     renderRightPanel();
     renderMap();
@@ -3445,13 +3528,25 @@ function removeStop(dayKey, truck, idx) {
     'This will undo the Trello changes (clear due date, OT field) and return the card to the queue.',
     async () => {
       try {
+        // 1. Move to RFS list FIRST (before clearing due date to prevent Butler conflict)
+        const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
+        const rfsList = lists.find(l => l.name === 'RFS');
+        if (rfsList) {
+          await trello(`/cards/${stop.id}`, 'PUT', { idList: rfsList.id });
+        }
+
+        // 2. Clear due date
         await trello(`/cards/${stop.id}`, 'PUT', { due: null });
+
+        // 3. Clear OT field
         await trello(`/cards/${stop.id}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
+
+        // 4. Post comment
         await trello(`/cards/${stop.id}/actions/comments`, 'POST', { text: '🔄 Removed from schedule via CF Dispatch' });
 
         state.schedule[dayKey][truck].splice(idx, 1);
         reoptimizeTruck(dayKey, truck);
-        state.queueCards.unshift({ ...stop, committed: false });
+        state.queueCards.unshift(stopToQueueCard(stop));
 
         showToast(`${stop.cardName || stop.name} un-committed and returned to queue`, 'info');
         renderQueue();
@@ -3511,19 +3606,23 @@ function dropStop(e, dayKey, truck, toIdx) {
   const toStops = state.schedule[dayKey]?.[truck];
   if (!fromStops || !toStops) { dragData = null; return; }
 
-  // Check capacity on target truck
-  if (toStops.length >= 4) {
-    showToast(`⚠ ${truck} is full (4 stops max)`, 'warning');
+  // Check if target truck is locked (Bug 4 fix — use helper, kill dead pattern)
+  if (isRouteLocked(dayKey, truck)) {
+    showToast(`🔒 Route ${truck} is locked`, 'warning');
     dragData = null;
     return;
   }
 
-  // Check if target truck is locked
-  const lockKey = `lock-${dayKey}-${truck}`;
-  if (state[lockKey]) {
-    showToast(`🔒 ${truck} is locked`, 'warning');
-    dragData = null;
-    return;
+  // Check capacity with overflow proximity (Bug 1 fix — was hard-coded 4, no proximity)
+  const movedStop = fromStops[fromIdx];
+  const ofCheck = checkOverflowAllowed(toStops, movedStop?.coords);
+  if (toStops.length >= MAX_STOPS) {
+    if (!ofCheck.allowed) {
+      showToast(`Route ${truck} is full (${MAX_STOPS} stops) — too far for overflow`, 'error');
+      dragData = null;
+      return;
+    }
+    showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
   }
 
   const [moved] = fromStops.splice(fromIdx, 1);
@@ -3532,10 +3631,9 @@ function dropStop(e, dayKey, truck, toIdx) {
   renderRightPanel();
   renderMap();
 
-  const fromLabel = fromTruck.replace('truck','Truck ').toUpperCase().replace('TRUCK ','Truck ');
-  const toLabel = truck.replace('truck','Truck ').toUpperCase().replace('TRUCK ','Truck ');
+  // Bug 3 fix — committed cross-truck awareness toast
   if (moved.committed) {
-    showToast(`⚠ Committed stop moved to ${toLabel} — Trello may need updating`, 'warning');
+    showToast(`↔ Committed stop moved to Route ${truck} — Trello comment unchanged`, 'info');
   } else {
     showToast(`↔ Moved to ${toLabel}, Stop ${toIdx + 1}`, 'info');
   }
@@ -3579,27 +3677,8 @@ function handleQueueDrop(e) {
   // Remove from schedule
   stops.splice(idx, 1);
 
-  // Rebuild as queue card and add back
-  const queueCard = {
-    id: stop.cardId || stop.id,
-    shortLink: stop.shortLink,
-    name: stop.cardName || stop.name,
-    address: stop.address,
-    coords: stop.coords,
-    quadrant: stop.quadrant,
-    invTotal: stop.invTotal,
-    customerName: stop.customerName,
-    customerPhone: stop.customerPhone,
-    requesterName: stop.requesterName,
-    requesterAvatar: stop.requesterAvatar,
-    rsValue: stop.rsValue,
-    firstStopRequested: stop.firstStopRequested,
-    whiteGlove: stop.whiteGlove,
-    equipRemoval: stop.equipRemoval,
-    stairs: stop.stairs,
-    dropoff: stop.dropoff,
-    deliveryNotes: stop.deliveryNotes,
-  };
+  // Rebuild as queue card using standardized helper (Bug 6 fix — was missing rider)
+  const queueCard = stopToQueueCard(stop);
   state.queueCards.push(queueCard);
 
   dragData = null;
@@ -3686,9 +3765,9 @@ function toggleTruckLock(truckKey, dayKey, truck) {
               }
             } catch(e) { /* no member found, skip mention */ }
 
-            // 2. Move to Requested for Schedule FIRST (before clearing due date to prevent Butler conflict)
+            // 2. Move to RFS list FIRST (before clearing due date to prevent Butler conflict)
             const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
-            const rsList = lists.find(l => l.name.toLowerCase().includes('requested for schedule'));
+            const rsList = lists.find(l => l.name === 'RFS');
             if (rsList) {
               await trello(`/cards/${stop.id}`, 'PUT', { idList: rsList.id });
             }
@@ -3708,28 +3787,8 @@ function toggleTruckLock(truckKey, dayKey, truck) {
           }
         }
 
-        // Return card to queue
-        state.queueCards.push({
-          id: stop.cardId || stop.id,
-          shortLink: stop.shortLink,
-          name: stop.cardName || stop.name,
-          address: stop.address,
-          coords: stop.coords,
-          quadrant: stop.quadrant,
-          invTotal: stop.invTotal,
-          customerName: stop.customerName,
-          customerPhone: stop.customerPhone,
-          requesterName: stop.requesterName,
-          requesterAvatar: stop.requesterAvatar,
-          firstStopRequested: stop.firstStopRequested,
-          whiteGlove: stop.whiteGlove,
-          equipRemoval: stop.equipRemoval,
-          stairs: stop.stairs,
-          dropoff: stop.dropoff,
-          deliveryNotes: stop.deliveryNotes,
-          rider: stop.rider,
-          rsValue: stop.rsValue,
-        });
+        // Return card to queue (Bug 8 fix — use helper, was missing requesterAvatar)
+        state.queueCards.push(stopToQueueCard(stop));
       }
 
       // Lock the truck
@@ -3905,15 +3964,15 @@ async function loadData() {
     // Load drivers from hidden board
     await loadDrivers();
 
-    // Load all board lists to find "Requested for Schedule"
+    // Load all board lists to find "RFS"
     const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
-    let rfsListId = lists.find(l => l.name.toLowerCase().includes('requested for schedule'))?.id;
+    let rfsListId = lists.find(l => l.name === 'RFS')?.id;
 
     // Auto-create if missing
     if (!rfsListId) {
-      const newList = await trello(`/boards/${BOARD_ID}/lists`, 'POST', { name: 'Requested for Schedule', pos: 'top' });
+      const newList = await trello(`/boards/${BOARD_ID}/lists`, 'POST', { name: 'RFS', pos: 'top' });
       rfsListId = newList.id;
-      showToast('"Requested for Schedule" list created', 'info');
+      showToast('"RFS" list created', 'info');
     }
 
     // Load cards from that list
