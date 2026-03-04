@@ -2517,14 +2517,23 @@ function renderMap() {
         const dayInfo = dates.find(d => d.key === key);
         const dateLabel = dayInfo ? dayInfo.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : key;
         const stopOwner = stop.requesterName || stop.salesperson || null;
-        const statusLabel = stop.committed ? 'Scheduled' : 'Staged';
-        const statusClass = stop.committed ? 'dt-scheduled' : 'dt-pending';
+
+        // Status line: committed = date, staged = algo %
+        let statusLine;
+        if (stop.committed) {
+          statusLine = `<span class="dt-scheduled">● Scheduled · ${dateLabel}</span>`;
+        } else {
+          const score = stop._colorScore ?? 15;
+          const pct = colorScoreToPercent ? colorScoreToPercent(score) : Math.round(99 - (score / 40) * 89);
+          const color = pct >= 85 ? '#4c9b3c' : pct >= 50 ? '#c09620' : '#c8553c';
+          statusLine = `<span style="color:${color};font-weight:600">● ${pct}% · ${dateLabel}</span>`;
+        }
 
         const stopOwnerLine = stopOwner ? `<div class="dt-owner">👤 ${stopOwner}</div>` : "";
-        const stopAddressLine = stop.address ? `<div class="dt-owner" style="opacity:0.7">📍 ${stop.address.split(',').slice(0,2).join(',')}</div>` : '';
-        const stopPhoneLine = stop.customerPhone ? `<div class="dt-owner" style="opacity:0.7">📞 ${stop.customerPhone}</div>` : '';
-        const stopCustomerLine = stop.customerName ? `<div class="dt-owner" style="opacity:0.7">🏢 ${stop.customerName}</div>` : '';
-        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopCustomerLine}${stopOwnerLine}${stopAddressLine}${stopPhoneLine}<div class="dt-status"><span class="${statusClass}">● ${statusLabel} · ${dateLabel}</span></div>`;
+        const stopCustomerLine = stop.customerName ? `<div class="dt-owner">🏢 ${stop.customerName}</div>` : '';
+        const stopPhoneLine = stop.customerPhone ? `<div class="dt-owner">📞 ${stop.customerPhone}</div>` : '';
+        const stopAddressLine = stop.address ? `<div class="dt-owner">📍 ${stop.address.split(',').slice(0,2).join(',')}</div>` : '';
+        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopCustomerLine}${stopOwnerLine}${stopPhoneLine}${stopAddressLine}<div class="dt-status">${statusLine}</div>`;
 
         const marker = L.marker([stop.coords.lat, stop.coords.lng], { icon })
           .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
@@ -2541,15 +2550,28 @@ function renderMap() {
       if (!card.coords) return;
       const owner = card.requesterName || null;
       const ownerLine = owner ? `<div class="dt-owner">👤 ${owner}</div>` : '';
-      const addressLine = card.address ? `<div class="dt-owner" style="opacity:0.7">📍 ${card.address.split(',').slice(0,2).join(',')}</div>` : '';
-      const phoneLine = card.customerPhone ? `<div class="dt-owner" style="opacity:0.7">📞 ${card.customerPhone}</div>` : '';
-      const customerLine = card.customerName ? `<div class="dt-owner" style="opacity:0.7">🏢 ${card.customerName}</div>` : '';
+      const addressLine = card.address ? `<div class="dt-owner">📍 ${card.address.split(',').slice(0,2).join(',')}</div>` : '';
+      const phoneLine = card.customerPhone ? `<div class="dt-owner">📞 ${card.customerPhone}</div>` : '';
+      const customerLine = card.customerName ? `<div class="dt-owner">🏢 ${card.customerName}</div>` : '';
+
       const rsInfo = parseRS(card.rsValue);
-      const rsLabel = rsInfo.type === 'date'
-        ? `${String(rsInfo.date.getMonth()+1).padStart(2,'0')}/${String(rsInfo.date.getDate()).padStart(2,'0')}`
-        : rsInfo.type === 'asap' ? 'ASAP' : 'Pending';
-      const tipHtml = `<div class="dt-name">${card.name}</div>${customerLine}${ownerLine}${addressLine}${phoneLine}<div class="dt-status"><span class="dt-pending">● Pending · RS: ${rsLabel}</span></div>`;
       const urgency = rsInfo.type === 'asap' ? 'asap' : 'normal';
+
+      // Status: algo % if we have a recommendation
+      const rec = typeof recommend === 'function' ? recommend(card) : null;
+      let statusLine;
+      if (rec) {
+        const pct = colorScoreToPercent(rec.colorScore);
+        const color = pct >= 85 ? '#4c9b3c' : pct >= 50 ? '#c09620' : '#c8553c';
+        const allDates = [...getWeekDates(0), ...getWeekDates(1)];
+        const recDay = allDates.find(d => d.key === rec.dayKey);
+        const recLabel = recDay ? recDay.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '';
+        statusLine = `<span style="color:${color};font-weight:600">● ${pct}% · ${recLabel}</span>`;
+      } else {
+        statusLine = `<span class="dt-pending">● Pending</span>`;
+      }
+
+      const tipHtml = `<div class="dt-name">${card.name}</div>${customerLine}${ownerLine}${phoneLine}${addressLine}<div class="dt-status">${statusLine}</div>`;
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin(urgency) })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
@@ -2557,7 +2579,6 @@ function renderMap() {
 
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
-        // Select card and focus PFP without losing it to the document click handler
         state.selectedCard = card;
         focusMapDot(card.id);
       });
@@ -3868,38 +3889,39 @@ function removeStop(dayKey, truck, idx) {
 
   // Committed — confirm dialog, undo Trello changes
   showConfirm(
-    '🗑️',
+    '↩',
     'Un-commit from schedule?',
     'This will undo the Trello changes (clear due date, OT field) and return the card to the queue.',
     async () => {
+      const cardId = stop.cardId || stop.id;
+
+      // 1. Update local state IMMEDIATELY — don't wait for Trello
+      state.schedule[dayKey][truck].splice(idx, 1);
+      reoptimizeTruck(dayKey, truck);
+      state.queueCards.unshift(stopToQueueCard(stop));
+      renderQueue();
+      renderRightPanel();
+      renderMap();
+      showToast(`↩ ${(stop.cardName || stop.name).split(' ').slice(0,3).join(' ')}… returned to queue`, 'info');
+
+      // 2. Undo Trello in background — each call independent so one failure doesn't block others
       try {
-        // 1. Move to RFS list FIRST (before clearing due date to prevent Butler conflict)
         const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
         const rfsList = lists.find(l => l.name === 'RFS');
-        if (rfsList) {
-          await trello(`/cards/${stop.id}`, 'PUT', { idList: rfsList.id });
-        }
+        if (rfsList) await trello(`/cards/${cardId}`, 'PUT', { idList: rfsList.id });
+      } catch(e) { console.warn('Uncommit: could not move to RFS', e); }
 
-        // 2. Clear due date
-        await trello(`/cards/${stop.id}`, 'PUT', { due: null });
+      try {
+        await trello(`/cards/${cardId}`, 'PUT', { due: null });
+      } catch(e) { console.warn('Uncommit: could not clear due date', e); }
 
-        // 3. Clear OT field
-        await trello(`/cards/${stop.id}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
+      try {
+        await trello(`/cards/${cardId}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
+      } catch(e) { console.warn('Uncommit: could not clear OT field', e); }
 
-        // 4. Post comment
-        await trello(`/cards/${stop.id}/actions/comments`, 'POST', { text: '🔄 Removed from schedule via CF Dispatch' });
-
-        state.schedule[dayKey][truck].splice(idx, 1);
-        reoptimizeTruck(dayKey, truck);
-        state.queueCards.unshift(stopToQueueCard(stop));
-
-        showToast(`${stop.cardName || stop.name} un-committed and returned to queue`, 'info');
-        renderQueue();
-        renderRightPanel();
-        renderMap();
-      } catch (e) {
-        showToast('Failed to unschedule in Trello — try again', 'error');
-      }
+      try {
+        await trello(`/cards/${cardId}/actions/comments`, 'POST', { text: '🔄 Removed from schedule via CF Dispatch' });
+      } catch(e) { console.warn('Uncommit: could not post comment', e); }
     }
   );
 }
