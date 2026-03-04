@@ -2513,26 +2513,22 @@ function renderMap() {
           iconAnchor: [12, 12]
         });
 
-        const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
         const dates = [...getWeekDates(0), ...getWeekDates(1)];
         const dayInfo = dates.find(d => d.key === key);
         const dateLabel = dayInfo ? dayInfo.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : key;
         const stopOwner = stop.requesterName || stop.salesperson || null;
-        const statusLabel = stop.committed ? 'Scheduled' : 'Pending';
+        const statusLabel = stop.committed ? 'Scheduled' : 'Staged';
         const statusClass = stop.committed ? 'dt-scheduled' : 'dt-pending';
-        const stopOwnerLine = stopOwner ? `<div class="dt-owner">\u{1F464} ${stopOwner}</div>` : "";
-        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopOwnerLine}<div class="dt-status"><span class="${statusClass}">\u25CF ${statusLabel} \u00B7 ${dateLabel}</span></div>`;
+
+        const stopOwnerLine = stopOwner ? `<div class="dt-owner">👤 ${stopOwner}</div>` : "";
+        const stopAddressLine = stop.address ? `<div class="dt-owner" style="opacity:0.7">📍 ${stop.address.split(',').slice(0,2).join(',')}</div>` : '';
+        const stopPhoneLine = stop.customerPhone ? `<div class="dt-owner" style="opacity:0.7">📞 ${stop.customerPhone}</div>` : '';
+        const stopCustomerLine = stop.customerName ? `<div class="dt-owner" style="opacity:0.7">🏢 ${stop.customerName}</div>` : '';
+        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopCustomerLine}${stopOwnerLine}${stopAddressLine}${stopPhoneLine}<div class="dt-status"><span class="${statusClass}">● ${statusLabel} · ${dateLabel}</span></div>`;
 
         const marker = L.marker([stop.coords.lat, stop.coords.lng], { icon })
           .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
           .addTo(map);
-
-        marker.on('click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          stop.dayKey = key;
-          const popupHtml = buildPopupHTML(stop);
-          marker.bindPopup(popupHtml, { maxWidth: 280, className: 'dispatch-popup' }).openPopup();
-        });
 
         if (!state.mapMarkers[key]) state.mapMarkers[key] = [];
         state.mapMarkers[key].push(marker);
@@ -2543,10 +2539,17 @@ function renderMap() {
   // Unscheduled dots — always visible so manager can see pending cards alongside any day's routes
   state.queueCards.forEach((card, idx) => {
       if (!card.coords) return;
-      const owner = card.requesterName || card.salesperson || null;
-      const ownerLine = owner ? `<div class="dt-owner">\u{1F464} ${owner}</div>` : '';
-      const tipHtml = `<div class="dt-name">${card.name}</div>${ownerLine}<div class="dt-status"><span class="dt-pending">\u25CF Pending</span></div>`;
-      const urgency = parseRS(card.rsValue).type === 'asap' ? 'asap' : 'normal';
+      const owner = card.requesterName || null;
+      const ownerLine = owner ? `<div class="dt-owner">👤 ${owner}</div>` : '';
+      const addressLine = card.address ? `<div class="dt-owner" style="opacity:0.7">📍 ${card.address.split(',').slice(0,2).join(',')}</div>` : '';
+      const phoneLine = card.customerPhone ? `<div class="dt-owner" style="opacity:0.7">📞 ${card.customerPhone}</div>` : '';
+      const customerLine = card.customerName ? `<div class="dt-owner" style="opacity:0.7">🏢 ${card.customerName}</div>` : '';
+      const rsInfo = parseRS(card.rsValue);
+      const rsLabel = rsInfo.type === 'date'
+        ? `${String(rsInfo.date.getMonth()+1).padStart(2,'0')}/${String(rsInfo.date.getDate()).padStart(2,'0')}`
+        : rsInfo.type === 'asap' ? 'ASAP' : 'Pending';
+      const tipHtml = `<div class="dt-name">${card.name}</div>${customerLine}${ownerLine}${addressLine}${phoneLine}<div class="dt-status"><span class="dt-pending">● Pending · RS: ${rsLabel}</span></div>`;
+      const urgency = rsInfo.type === 'asap' ? 'asap' : 'normal';
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin(urgency) })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
@@ -2557,9 +2560,6 @@ function renderMap() {
         // Select card and focus PFP without losing it to the document click handler
         state.selectedCard = card;
         focusMapDot(card.id);
-        // Open full-detail popup
-        const popupHtml = buildQueuePopupHTML(card);
-        marker.bindPopup(popupHtml, { maxWidth: 280, className: 'dispatch-popup' }).openPopup();
       });
       state.unscheduledMarkers.push(marker);
     });
@@ -2899,6 +2899,7 @@ function buildQueueCard(card) {
 // RENDER RIGHT PANEL
 // ════════════════════════════════════════════════════════
 function renderRightPanel() {
+  saveSchedule();
   renderRouteSheet();
 }
 
@@ -4083,68 +4084,39 @@ function toggleTruckLock(truckKey, dayKey, truck) {
 
   // Truck has stops — confirm dialog
   const committedCount = stops.filter(s => s.committed).length;
+  const stagedCount = stops.filter(s => !s.committed).length;
   const totalCount = stops.length;
-  const msg = committedCount > 0
-    ? `${totalCount} stop${totalCount > 1 ? 's' : ''} (${committedCount} committed) will return to Pending. Trello changes will be undone.`
-    : `${totalCount} stop${totalCount > 1 ? 's' : ''} will return to Pending.`;
+  const msg = committedCount > 0 && stagedCount > 0
+    ? `${stagedCount} staged stop${stagedCount > 1 ? 's' : ''} will return to Pending. ${committedCount} committed stop${committedCount > 1 ? 's' : ''} will remain (already in Trello).`
+    : committedCount > 0
+    ? `${committedCount} committed stop${committedCount > 1 ? 's' : ''} will remain (already in Trello). Algo will stop suggesting this route.`
+    : `${stagedCount} staged stop${stagedCount > 1 ? 's' : ''} will return to Pending.`;
 
   showConfirm(
     '🔒',
     `Lock Route ${truck}?`,
     msg,
     async () => {
-      // Bounce all stops back to queue
-      const stopsToReturn = [...stops];
-      state.schedule[dayKey][truck] = [];
+      const stopsToProcess = [...stops];
 
-      for (const stop of stopsToReturn) {
-        if (stop.committed) {
-          // Committed card — undo Trello changes
-          try {
-            // 1. Get card member username for @mention
-            let memberMention = '';
-            try {
-              const members = await trello(`/cards/${stop.id}/members`);
-              if (members && members.length > 0) {
-                memberMention = ` @${members[0].username}`;
-              }
-            } catch(e) { /* no member found, skip mention */ }
-
-            // 2. Move to RFS list FIRST (before clearing due date to prevent Butler conflict)
-            const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
-            const rsList = lists.find(l => l.name === 'RFS');
-            if (rsList) {
-              await trello(`/cards/${stop.id}`, 'PUT', { idList: rsList.id });
-            }
-
-            // 3. Clear due date
-            await trello(`/cards/${stop.id}`, 'PUT', { due: null });
-
-            // 4. Clear OT field
-            await trello(`/cards/${stop.id}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
-
-            // 5. Post comment with @mention for Butler → Slack notification
-            await trello(`/cards/${stop.id}/actions/comments`, 'POST', {
-              text: `🔒 Truck unavailable — returned to Pending via CF Dispatch${memberMention}`
-            });
-          } catch(e) {
-            console.error('Failed to undo Trello for', stop.name, e);
-          }
-        }
-
-        // Return card to queue (Bug 8 fix — use helper, was missing requesterAvatar)
+      // Only bounce STAGED stops — committed stay (already written to Trello)
+      const staged = stopsToProcess.filter(s => !s.committed);
+      for (const stop of staged) {
         state.queueCards.push(stopToQueueCard(stop));
       }
+      // Keep committed stops in schedule; remove staged
+      state.schedule[dayKey][truck] = stopsToProcess.filter(s => s.committed);
 
       // Lock the truck
       state.lockedTrucks[truckKey] = true;
       saveLockState();
+      saveSchedule();
 
       renderQueue();
       renderRightPanel();
       renderMap();
 
-      showToast(`🔒 Route ${truck} locked — ${totalCount} stop${totalCount > 1 ? 's' : ''} returned to Pending`, 'info');
+      showToast(`🔒 Route ${truck} locked${staged.length > 0 ? ` — ${staged.length} staged stop${staged.length > 1 ? 's' : ''} returned to Pending` : ''}`, 'info');
     }
   );
 }
@@ -4315,6 +4287,17 @@ function applyRiderState(cards) {
   cards.forEach(c => { if (riderIds.has(c.id)) c.rider = true; });
 }
 
+// ── SCHEDULE PERSISTENCE ──
+function saveSchedule() {
+  try { localStorage.setItem('cf_dispatch_schedule', JSON.stringify(state.schedule)); } catch(e) {}
+}
+function loadSchedule() {
+  try {
+    const saved = localStorage.getItem('cf_dispatch_schedule');
+    if (saved) state.schedule = JSON.parse(saved);
+  } catch(e) {}
+}
+
 let _loadDataInFlight = false;
 
 
@@ -4374,9 +4357,11 @@ async function loadData() {
     // Runs AFTER render so it never delays the UI or creates a race window
     Promise.all(state.queueCards.map(async (card) => {
       try {
-        const actions = await trello(`/cards/${card.id}/actions?filter=updateCard&limit=30`);
+        const actions = await trello(`/cards/${card.id}/actions?filter=updateCard,createCard&limit=50`);
         const rfsAction = actions.find(a => a.data?.listAfter?.name === 'RFS');
-        card.queuedAt = rfsAction ? rfsAction.date : null;
+        // Fallback: if card was created directly in RFS, use createCard action date
+        const createAction = actions.find(a => a.type === 'createCard');
+        card.queuedAt = rfsAction ? rfsAction.date : (createAction ? createAction.date : null);
       } catch(e) { card.queuedAt = null; }
     })).then(() => { renderQueue(); }).catch(() => {});
 
@@ -4733,6 +4718,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Restore lock state from localStorage
   loadLockState();
+
+  // Restore schedule (staged + committed stops) from localStorage
+  loadSchedule();
 
   // Set default right panel day to next Monday
   const week1 = getWeekDates(0);
