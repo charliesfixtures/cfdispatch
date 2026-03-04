@@ -3062,6 +3062,7 @@ function toggleRider(cardId) {
   const card = state.queueCards.find(c => c.id === cardId);
   if (!card) return;
   card.rider = !card.rider;
+  saveRiderState();
   renderQueue();
   if (card.rider) {
     showToast(`🏷 ${card.name.split(' ').slice(0,3).join(' ')}… flagged as rider — waiting for in-route match`, 'info');
@@ -4279,7 +4280,25 @@ function assignDriverToTruck(dayKey, truck, driverId) {
 // ════════════════════════════════════════════════════════
 // DATA LOADING
 // ════════════════════════════════════════════════════════
+// ── RIDER PERSISTENCE ──
+function saveRiderState() {
+  const riderIds = state.queueCards.filter(c => c.rider).map(c => c.id);
+  try { localStorage.setItem('cf_dispatch_riders', JSON.stringify(riderIds)); } catch(e) {}
+}
+function loadRiderState() {
+  try { return new Set(JSON.parse(localStorage.getItem('cf_dispatch_riders') || '[]')); } catch(e) { return new Set(); }
+}
+function applyRiderState(cards) {
+  const riderIds = loadRiderState();
+  cards.forEach(c => { if (riderIds.has(c.id)) c.rider = true; });
+}
+
+let _loadDataInFlight = false;
+
+
 async function loadData() {
+  if (_loadDataInFlight) return; // concurrency guard — skip if already running
+  _loadDataInFlight = true;
   setSyncStatus('syncing', 'Syncing...');
 
   try {
@@ -4307,18 +4326,10 @@ async function loadData() {
       processed.push(processed_card);
     }
 
-    state.queueCards = processed;
+    // Restore rider (free) flags from localStorage before filtering/rendering
+    applyRiderState(processed);
 
-    // Parallel-fetch RFS entry timestamps (FCFS — most recent listAfter=RFS action)
-    await Promise.all(state.queueCards.map(async (card) => {
-      try {
-        const actions = await trello(`/cards/${card.id}/actions?filter=updateCard&limit=30`);
-        const rfsAction = actions.find(a => a.data?.listAfter?.name === 'RFS');
-        card.queuedAt = rfsAction ? rfsAction.date : null;
-      } catch(e) { card.queuedAt = null; }
-    }));
-
-    // Remove cards that have been dragged into the schedule (staged or committed)
+    // Remove cards already in the schedule (staged or committed)
     const scheduledCardIds = new Set();
     for (const dayKey of Object.keys(state.schedule)) {
       for (const truck of Object.keys(state.schedule[dayKey])) {
@@ -4327,7 +4338,7 @@ async function loadData() {
         }
       }
     }
-    state.queueCards = state.queueCards.filter(c => !scheduledCardIds.has(c.id));
+    state.queueCards = processed.filter(c => !scheduledCardIds.has(c.id));
 
     // Load already-scheduled cards (OT = true) for map display
     await loadScheduledCards();
@@ -4337,9 +4348,21 @@ async function loadData() {
     renderRightPanel();
     renderMap();
 
+    // queuedAt fetch — non-blocking fire-and-forget
+    // Runs AFTER render so it never delays the UI or creates a race window
+    Promise.all(state.queueCards.map(async (card) => {
+      try {
+        const actions = await trello(`/cards/${card.id}/actions?filter=updateCard&limit=30`);
+        const rfsAction = actions.find(a => a.data?.listAfter?.name === 'RFS');
+        card.queuedAt = rfsAction ? rfsAction.date : null;
+      } catch(e) { card.queuedAt = null; }
+    })).then(() => { renderQueue(); }).catch(() => {});
+
   } catch (e) {
     setSyncStatus('error', 'Sync failed');
     if (!e.message?.includes('AUTH')) showToast('Failed to load data from Trello', 'error');
+  } finally {
+    _loadDataInFlight = false;
   }
 }
 
