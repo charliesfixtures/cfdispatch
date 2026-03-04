@@ -3242,13 +3242,15 @@ function focusMapDot(cardId) {
         dot.style.border = '2px solid white';
         dot.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
         dot.style.animation = 'none';
-        dot.style.background = '';
-        // Re-apply background-image since shorthand overrides
+        // Compensate for anchor offset: iconAnchor was [5,5] for 10×10 icon.
+        // Enlarging to 30×30 shifts center by (30-10)/2 = 10px. Translate back.
+        dot.style.transform = 'translate(-10px, -10px)';
+        // backgroundImage must be re-applied after animation reset
         dot.style.backgroundImage = `url(${card.requesterAvatar})`;
       } else {
         dot.style.width = '16px';
         dot.style.height = '16px';
-        dot.style.transform = 'scale(1.0)';
+        dot.style.transform = 'translate(-3px, -3px)';
       }
     } else {
       dot.classList.remove('selected');
