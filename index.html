@@ -1,4 +1,4 @@
-<!-- CF Dispatch · S25 · v1.0 · 2026-03-04 -->
+<!-- CF Dispatch · S25 · v1.1 · 2026-03-04 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2539,8 +2539,13 @@ function renderMap() {
         }
 
         const stopOwnerLine = stopOwner ? `<div class="dt-owner">👤 ${stopOwner}</div>` : "";
-        const stopCustomerLine = stop.customerName ? `<div class="dt-owner">🏢 ${stop.customerName}</div>` : '';
-        const stopPhoneLine = stop.customerPhone ? `<div class="dt-owner">📞 ${stop.customerPhone}</div>` : '';
+        // Always show customer + phone — empty = placeholder nudge (mirrors popover behavior)
+        const stopCustomerLine = stop.customerName
+          ? `<div class="dt-owner">🏢 ${stop.customerName}</div>`
+          : `<div class="dt-owner" style="color:rgba(0,0,0,0.28)"><em>No contact name</em></div>`;
+        const stopPhoneLine = stop.customerPhone
+          ? `<div class="dt-owner">📞 ${stop.customerPhone}</div>`
+          : `<div class="dt-owner" style="color:rgba(0,0,0,0.28)"><em>No phone on file</em></div>`;
         const stopAddressLine = stop.address ? `<div class="dt-owner">📍 ${stop.address.split(',').slice(0,2).join(',')}</div>` : '';
         // Row order: Card Name → Customer → Phone → Address → Salesperson (card owner)
         const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopCustomerLine}${stopPhoneLine}${stopAddressLine}${stopOwnerLine}<div class="dt-status">${statusLine}</div>`;
@@ -2561,8 +2566,13 @@ function renderMap() {
       const owner = card.requesterName || null;
       const ownerLine = owner ? `<div class="dt-owner">👤 ${owner}</div>` : '';
       const addressLine = card.address ? `<div class="dt-owner">📍 ${card.address.split(',').slice(0,2).join(',')}</div>` : '';
-      const phoneLine = card.customerPhone ? `<div class="dt-owner">📞 ${card.customerPhone}</div>` : '';
-      const customerLine = card.customerName ? `<div class="dt-owner">🏢 ${card.customerName}</div>` : '';
+      // Always show customer + phone — empty = placeholder nudge (mirrors popover behavior)
+      const customerLine = card.customerName
+        ? `<div class="dt-owner">🏢 ${card.customerName}</div>`
+        : `<div class="dt-owner" style="color:rgba(0,0,0,0.28)"><em>No contact name</em></div>`;
+      const phoneLine = card.customerPhone
+        ? `<div class="dt-owner">📞 ${card.customerPhone}</div>`
+        : `<div class="dt-owner" style="color:rgba(0,0,0,0.28)"><em>No phone on file</em></div>`;
       // Row order: Card Name → Customer → Phone → Address → Salesperson (card owner)
 
       const rsInfo = parseRS(card.rsValue);
