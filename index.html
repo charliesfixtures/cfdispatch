@@ -1,4 +1,4 @@
-<!-- CF Dispatch · S25 · v1.1 · 2026-03-04 -->
+<!-- CF Dispatch · S25 · v1.2 · 2026-03-04 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1751,6 +1751,12 @@ body {
       <!-- populated dynamically -->
     </div>
 
+    <!-- View mode toggle (TEMP — remove at final product) -->
+    <div id="view-mode-toggle" style="position:absolute;top:54px;left:12px;z-index:500;display:flex;align-items:center;gap:0;background:rgba(220,215,205,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.35);border-radius:8px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+      <button id="vmt-manager" onclick="setViewMode('manager')" style="font-size:10px;font-weight:700;font-family:'Inter Tight',sans-serif;padding:4px 10px;border-radius:5px;border:none;cursor:pointer;transition:all 0.15s">👔 Manager</button>
+      <button id="vmt-salesperson" onclick="setViewMode('salesperson')" style="font-size:10px;font-weight:700;font-family:'Inter Tight',sans-serif;padding:4px 10px;border-radius:5px;border:none;cursor:pointer;transition:all 0.15s">🙋 Salesperson</button>
+    </div>
+
     <!-- Suggestion banner -->
     <div class="suggestion-banner" id="suggestion-banner">
       <div class="suggestion-text">
@@ -1791,10 +1797,6 @@ body {
     <div class="first-stop-section" id="first-stop-section" style="display:none">
       <div class="first-stop-title">🥇 First Stop Requested</div>
       <div class="first-stop-desc" id="first-stop-desc">Customer has requested first stop delivery.</div>
-      <div class="first-stop-btns">
-        <div class="fs-btn" id="fs-approve" onclick="setFirstStopStatus('approved')">✓ Approve</div>
-        <div class="fs-btn revoke" id="fs-revoke" onclick="setFirstStopStatus('revoked')">✗ Revoke</div>
-      </div>
     </div>
 
     <div class="modal-row">
@@ -1999,6 +2001,7 @@ let state = {
   popoverTarget: null,  // { type: 'queue'|'stop', id, dayKey?, truck?, index?, el? }
   lockedTrucks: {},      // { 'MON-W1-A': true }
   showTruckB: false,     // hidden by default — Truck A only at start
+  viewMode: 'manager',   // 'manager' | 'salesperson' — toggle under day pills, removed at final product
   showTruckC: false,     // hidden by default
   mapMarkers: {},
   mapRouteLines: {},
@@ -3019,17 +3022,23 @@ function renderRouteSheet() {
       : '';
 
     // Avatar HTML — either assigned driver photo or placeholder
+    // Manager: clickable to open driver picker. Salesperson: display only.
+    const isManager = state.viewMode === 'manager';
     const avatarHTML = driver
       ? `<div class="driver-tip-wrap">
-          <div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)">
+          <div class="truck-driver-avatar-wrap ${isUnavailable ? 'unavailable' : ''}" ${isManager ? `onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)"` : 'style="cursor:default"'}>
             <img class="truck-driver-img" src="${driverImg}" onerror="this.style.background='#2e3850';this.src=''" alt="${driverName}" />
             ${isUnavailable ? '<div class="driver-unavail-badge">!</div>' : ''}
           </div>
           ${driverTipHTML}
         </div>`
-      : `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Assign a driver">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>`;
+      : (isManager
+          ? `<div class="truck-driver-placeholder" onclick="event.stopPropagation();openDriverPicker('${key}','${truck}',this)" title="Assign a driver">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>`
+          : `<div class="truck-driver-placeholder" style="cursor:default;opacity:0.4">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>`);
 
     html += `<div class="truck-section ${isUnavailable ? 'driver-warn' : ''} ${isLocked ? 'truck-locked' : ''}"
       ondragover="handleTruckDragOver(event,'${key}','${truck}')"
@@ -3042,9 +3051,9 @@ function renderRouteSheet() {
           <div class="truck-label">Route ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">Unavailable</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
-        <button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck (unavailable)'}">
+        ${state.viewMode === 'manager' ? `<button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck (unavailable)'}">
           ${isLocked ? '🔒' : '🔓'}
-        </button>
+        </button>` : ''}
       </div>`;
 
     if (stops.length === 0) {
@@ -3090,7 +3099,10 @@ function renderRouteSheet() {
           ? `<span class="staged-time" style="opacity:0.65">Queued ${new Date(stop.queuedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>`
           : '';
 
-        html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
+        // Salesperson: committed stops are not draggable
+        const isDraggable = isCommitted ? (state.viewMode === 'manager') : true;
+
+        html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="${isDraggable}"
           style="--day-color:${stopDayColor}"
           onclick="showCardPopover('stop','${stop.cardId || stop.id}',this,'${key}','${truck}',${i})"
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
@@ -3104,8 +3116,8 @@ function renderRouteSheet() {
             ${stopTagStrip ? `<div class="qc-flags" style="margin-top:3px">${stopTagStrip}</div>` : ''}
           </div>
           <div class="stop-actions">
-            ${isStaged ? `<button class="stop-check-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">✓</button>` : ''}
-            ${isCommitted ? `<button class="stop-btn remove" onclick="event.stopPropagation();removeStop('${key}','${truck}',${i})" title="Uncommit">✕</button>` : ''}
+            ${isStaged && state.viewMode === 'manager' ? `<button class="stop-check-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">✓</button>` : ''}
+            ${isCommitted && state.viewMode === 'manager' ? `<button class="stop-btn remove" onclick="event.stopPropagation();removeStop('${key}','${truck}',${i})" title="Uncommit">✕</button>` : ''}
           </div>
           ${(stagedTimeHtml || queuedTimeHtml) ? `<div class="staged-meta">${stagedTimeHtml}${queuedTimeHtml}</div>` : ''}
         </div>`;
@@ -3550,7 +3562,13 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   }
 
   // Find best insert position using algo (or use specified position)
-  const insertPos = typeof insertAtIdx === 'number' ? insertAtIdx : bestInsertPosition(stops, card.coords);
+  let insertPos = typeof insertAtIdx === 'number' ? insertAtIdx : bestInsertPosition(stops, card.coords);
+
+  // First stop gate — salesperson cannot displace a committed position 0
+  if (state.viewMode === 'salesperson' && insertPos === 0 && stops[0]?.committed) {
+    insertPos = 1; // silently push to position 2
+    showToast('🔒 First stop is committed — staged at stop 2', 'info');
+  }
 
   // Build stop object from card (staged, not committed)
   const newStop = {
@@ -3569,7 +3587,6 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     requesterAvatar: card.requesterAvatar,
     rsValue: card.rsValue,
     firstStopRequested: card.firstStopRequested,
-    firstStopApproved: card.firstStopRequested,
     lastStopRequested: card.lastStopRequested,
     dropoff: card.dropoff,
     deliveryMemo: card.deliveryMemo,
@@ -3728,7 +3745,6 @@ function openAssignModal(card, prefilled) {
   const fsSection = document.getElementById('first-stop-section');
   if (c.firstStopRequested) {
     fsSection.style.display = 'block';
-    setFirstStopStatus(null); // reset
   } else {
     fsSection.style.display = 'none';
   }
@@ -3760,13 +3776,7 @@ function openAssignModal(card, prefilled) {
   document.getElementById('assign-modal').classList.add('open');
 }
 
-let firstStopModalStatus = null;
-
-function setFirstStopStatus(status) {
-  firstStopModalStatus = status;
-  document.getElementById('fs-approve').className = `fs-btn ${status === 'approved' ? 'selected' : ''}`;
-  document.getElementById('fs-revoke').className = `fs-btn revoke ${status === 'revoked' ? 'selected' : ''}`;
-}
+// setFirstStopStatus removed — approve/revoke UI removed S25. Crown = committed at index 0.
 
 function confirmAssign() {
   const card = state.selectedCard;
@@ -3787,7 +3797,7 @@ function confirmAssign() {
 
   const pos = stopPos === 'auto' ? bestInsertPosition(state.schedule[dayKey]?.[truck] || [], card.coords) : parseInt(stopPos);
 
-  applyAssignment(card, dayKey, truck, pos, firstStopModalStatus);
+  applyAssignment(card, dayKey, truck, pos);
   closeModal('assign-modal');
 }
 
@@ -3804,11 +3814,22 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
   var existingStops = state.schedule[dayKey]?.[truck] || [];
   var ofCheck = checkOverflowAllowed(existingStops, card.coords);
   if (existingStops.length >= MAX_STOPS) {
-    if (!ofCheck.allowed) {
+    if (state.viewMode === 'manager') {
+      // Manager full bypass — no distance gate
+      showToast('⚠ Over capacity (' + (existingStops.length + 1) + '/' + MAX_STOPS + ') — manager override', 'warning');
+    } else if (!ofCheck.allowed) {
       showToast('Route ' + truck + ' is full (' + MAX_STOPS + ' stops) — card too far for overflow', 'error');
       return;
+    } else {
+      showToast('⚠ Over capacity (' + (existingStops.length + 1) + '/' + MAX_STOPS + ') — nearby, allowed', 'warning');
     }
-    showToast('⚠ Over capacity (' + (existingStops.length + 1) + '/' + MAX_STOPS + ') — nearby, allowed', 'warning');
+  }
+
+  // First stop gate — salesperson cannot displace a committed position 0
+  let safePos = pos;
+  if (state.viewMode === 'salesperson' && safePos === 0 && existingStops[0]?.committed) {
+    safePos = 1;
+    showToast('🔒 First stop is committed — staged at stop 2', 'info');
   }
 
   if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
@@ -3830,8 +3851,6 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
     requesterAvatar: card.requesterAvatar,
     rsValue: card.rsValue,
     firstStopRequested: card.firstStopRequested,
-    firstStopApproved: firstStopStatus === 'approved',
-    firstStopRevoked: firstStopStatus === 'revoked',
     lastStopRequested: card.lastStopRequested,
     dropoff: card.dropoff,
     deliveryMemo: card.deliveryMemo,
@@ -3848,14 +3867,10 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
     queuedAt: card.queuedAt || null,
   };
 
-  // Handle first stop lock
-  if (firstStopStatus === 'approved') {
-    state.schedule[dayKey][truck].unshift(stop);
-  } else {
-    state.schedule[dayKey][truck].splice(pos, 0, stop);
-  }
+  // Place at safe position (first stop gate already applied above)
+  state.schedule[dayKey][truck].splice(safePos, 0, stop);
 
-  // Reoptimize order (unless first stop is locked)
+  // Reoptimize order
   reoptimizeTruck(dayKey, truck);
 
   // Remove from queue
@@ -3875,18 +3890,8 @@ function reoptimizeTruck(dayKey, truck) {
   const stops = state.schedule[dayKey]?.[truck];
   if (!stops || stops.length <= 1) return;
 
-  // Find locked first stop
-  const firstIdx = stops.findIndex(s => s.firstStopApproved);
-
-  if (firstIdx >= 0) {
-    const first = stops[firstIdx];
-    const rest = stops.filter((_, i) => i !== firstIdx);
-    // Optimize rest
-    const optimized = optimizeOrder(rest);
-    state.schedule[dayKey][truck] = [first, ...optimized];
-  } else {
-    state.schedule[dayKey][truck] = optimizeOrder(stops);
-  }
+  // Crown = committed at index 0. No pinning needed — reoptimize all stops freely.
+  state.schedule[dayKey][truck] = optimizeOrder(stops);
 }
 
 function optimizeOrder(stops) {
@@ -3997,6 +4002,15 @@ function dropStop(e, dayKey, truck, toIdx) {
   if (fromDay === dayKey && fromTruck === truck) {
     if (fromIdx === toIdx) { dragData = null; return; }
     const stops = state.schedule[dayKey][truck];
+    const movedStop = stops[fromIdx];
+
+    // First stop gate — salesperson cannot drag a staged stop to position 0 if committed card is there
+    if (state.viewMode === 'salesperson' && toIdx === 0 && stops[0]?.committed && !movedStop?.committed) {
+      showToast('🔒 First stop is committed — stage at stop 2 or later', 'warning');
+      dragData = null;
+      return;
+    }
+
     const [moved] = stops.splice(fromIdx, 1);
     stops.splice(toIdx, 0, moved);
     dragData = null;
@@ -4673,6 +4687,30 @@ function renderDayPills() {
   container.innerHTML = html;
 }
 
+function setViewMode(mode) {
+  state.viewMode = mode;
+  updateViewModeToggle();
+  renderQueue();
+  renderRightPanel();
+}
+
+function updateViewModeToggle() {
+  const mgr = document.getElementById('vmt-manager');
+  const sp  = document.getElementById('vmt-salesperson');
+  if (!mgr || !sp) return;
+  const isManager = state.viewMode === 'manager';
+  mgr.style.background = isManager  ? 'rgba(0,0,0,0.75)' : 'transparent';
+  mgr.style.color       = isManager  ? '#fff'             : 'rgba(0,0,0,0.45)';
+  sp.style.background  = !isManager ? 'rgba(0,0,0,0.75)' : 'transparent';
+  sp.style.color        = !isManager ? '#fff'             : 'rgba(0,0,0,0.45)';
+  // Truck C — manager only
+  const truckCBtn = document.getElementById('truck-c-btn');
+  const truckBBtn = document.getElementById('truck-b-btn');
+  if (truckCBtn) truckCBtn.style.display = (!isManager || !state.showTruckB) ? 'none' : (state.showTruckC ? 'inline-flex' : 'inline-flex');
+  if (!isManager && truckBBtn) truckBBtn.style.display = state.showTruckB ? 'none' : 'inline-flex';
+}
+
+
 function setDayFilter(key) {
   state.activeDayFilter = key;
 
@@ -4787,6 +4825,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Render dynamic day pills
   renderDayPills();
+  updateViewModeToggle();
 
   // Load data
   loadData();
