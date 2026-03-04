@@ -267,7 +267,7 @@ body {
 
 .queue-card.dragging { opacity: 0.4; transform: rotate(1deg); }
 
-.qc-title { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.55); margin-bottom: 6px; line-height: 1.25; padding-right: 38px; font-family: 'Inter Tight', sans-serif; }
+.qc-title { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.55); margin-bottom: 4px; line-height: 1.25; padding-right: 36px; font-family: 'Inter Tight', sans-serif; }
 
 .qc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0 0; align-items: center; }
 
@@ -282,6 +282,31 @@ body {
   color: rgba(0,0,0,0.45);
   background: rgba(0,0,0,0.05);
   border: none;
+}
+.qc-tag.warn-tag {
+  background: rgba(224,122,95,0.15);
+  color: var(--danger);
+}
+.qc-tag.free-tag {
+  background: rgba(110,207,150,0.12);
+  color: rgba(60,140,90,0.8);
+}
+.qc-address {
+  font-size: 11px;
+  color: rgba(0,0,0,0.38);
+  margin: 2px 0 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 36px;
+  font-family: 'Inter Tight', sans-serif;
+}
+.qc-queued {
+  font-size: 10px;
+  color: rgba(0,0,0,0.28);
+  font-family: 'Inter Tight', sans-serif;
+  margin-top: 4px;
+  font-style: italic;
 }
 
 /* Algo recommendation strip */
@@ -735,7 +760,7 @@ body {
 .stop-item[draggable="true"]:hover { cursor: grab; }
 
 .stop-content { flex: 1; min-width: 0; overflow: hidden; }
-.stop-name { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.stop-name { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.6); line-height: 1.3; word-break: break-word; max-width: 100%; }
 .stop-meta { font-size: 10px; color: rgba(0,0,0,0.35); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
 
 .stop-flag {
@@ -776,6 +801,22 @@ body {
 
 .stop-btn:hover { background: rgba(0,0,0,0.1); color: rgba(0,0,0,0.7); }
 .stop-btn.remove:hover { background: rgba(224,122,95,0.1); border-color: rgba(224,122,95,0.3); color: var(--danger); }
+.stop-check-btn {
+  width: 22px; height: 22px;
+  border-radius: 5px;
+  border: 1px solid rgba(110,207,150,0.4);
+  background: rgba(110,207,150,0.12);
+  color: rgba(60,140,90,0.8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.stop-check-btn:hover { background: rgba(110,207,150,0.25); border-color: rgba(110,207,150,0.6); }
 
 /* Route endpoints */
 .route-endpoint {
@@ -1920,6 +1961,7 @@ function stopToQueueCard(stop) {
     deliveryNotes: stop.deliveryNotes,
     flags: stop.flags || [],
     rider: stop.rider,
+    queuedAt: stop.queuedAt || null,
   };
 }
 
@@ -2637,6 +2679,46 @@ function colorScoreToPercent(score) {
 }
 
 // ════════════════════════════════════════════════════════
+// TAG STRIP BUILDER — unified across all card phases
+// phase: 'queue' | 'staged' | 'committed'
+// ════════════════════════════════════════════════════════
+function buildTagStrip(data, phase) {
+  const flags = data.flags || [];
+  const tags = [];
+
+  // QUAD + RS — queue and staged only
+  if (phase !== 'committed') {
+    if (data.quadrant) tags.push(`<span class="qc-tag">${data.quadrant}</span>`);
+    const rsInfo = parseRS(data.rsValue);
+    let rsDisplay = 'ANY';
+    if (rsInfo.type === 'asap') rsDisplay = 'ASAP';
+    else if (rsInfo.type === 'date') rsDisplay = `${String(rsInfo.date.getMonth()+1).padStart(2,'0')}/${String(rsInfo.date.getDate()).padStart(2,'0')}`;
+    else if (rsInfo.type === 'past') rsDisplay = '⚠PST';
+    tags.push(`<span class="qc-tag">${rsDisplay}</span>`);
+  }
+
+  // WG or DRP (mutually exclusive)
+  if (flags.includes('DRP')) tags.push(`<span class="qc-tag">DRP</span>`);
+  else if (flags.includes('WG')) tags.push(`<span class="qc-tag">WG</span>`);
+
+  // 1ST / LST
+  if (flags.includes('1ST')) tags.push(`<span class="qc-tag">1ST</span>`);
+  if (flags.includes('LST')) tags.push(`<span class="qc-tag">LST</span>`);
+
+  // D / P
+  if (flags.includes('D')) tags.push(`<span class="qc-tag">D</span>`);
+  if (flags.includes('P')) tags.push(`<span class="qc-tag">P</span>`);
+
+  // ⚠️ special request — red pill
+  if (flags.includes('⚠️')) tags.push(`<span class="qc-tag warn-tag">⚠</span>`);
+
+  // 🎁 free / rider
+  if (data.rider) tags.push(`<span class="qc-tag free-tag">🎁</span>`);
+
+  return tags.join('');
+}
+
+// ════════════════════════════════════════════════════════
 // RENDER LEFT PANEL
 // ════════════════════════════════════════════════════════
 function renderQueue() {
@@ -2693,18 +2775,13 @@ function buildQueueCard(card) {
     avatarHtml = `<div class="qc-avatar-initials" title="${card.requesterName}">${initials}</div>`;
   }
 
-  // Tags — monotone
-  const quadrant = card.quadrant || '';
-  const rsInfo = parseRS(card.rsValue);
-  let rsDisplay = 'ANY';
-  if (rsInfo.type === 'asap') rsDisplay = 'ASAP';
-  else if (rsInfo.type === 'date') rsDisplay = `${String(rsInfo.date.getMonth()+1).padStart(2,'0')}/${String(rsInfo.date.getDate()).padStart(2,'0')}`;
-  else if (rsInfo.type === 'past') rsDisplay = '⚠ Past';
-  else if (rsInfo.type === 'flexible' || rsInfo.type === 'empty') rsDisplay = 'ANY';
-  else if (card.rsValue && card.rsValue !== '') rsDisplay = card.rsValue;
+  // Address line — first two segments
+  const addressLine = card.address
+    ? `<div class="qc-address">${card.address.split(',').slice(0,2).join(',').trim()}</div>`
+    : '';
 
-  // Shipping flags — fixed order: [QUAD] [RS] [WG/DRP] [1ST/LST] [D] [P] [⚠️]
-  const shippingTags = (card.flags || []).map(f => `<span class="qc-tag">${f}</span>`).join('');
+  // Unified tag strip
+  const tagStrip = buildTagStrip(card, 'queue');
 
   // Algo strip — show top 2 recommendations with RS context
   let algoStrip = '';
@@ -2729,11 +2806,10 @@ function buildQueueCard(card) {
     const recs = recommendMultiple(card, 3);
     const dayNames = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' };
 
-    // Score → color: green (<5 = likely), gold (5-20 = possible), red (>20 = unlikely)
     function algoColor(score) {
-      if (score < 5) return 'rgba(76,155,60,0.85)';   // green — high likelihood
-      if (score <= 20) return 'rgba(190,150,40,0.8)';  // gold — moderate
-      return 'rgba(200,85,60,0.8)';                     // red — low likelihood
+      if (score < 5) return 'rgba(76,155,60,0.85)';
+      if (score <= 20) return 'rgba(190,150,40,0.8)';
+      return 'rgba(200,85,60,0.8)';
     }
 
     if (recs.length > 0 && recs[0].routesFull) {
@@ -2745,7 +2821,6 @@ function buildQueueCard(card) {
         <span style="color:rgba(160,110,30,0.45);font-size:10.5px;font-family:'Inter Tight',sans-serif">· Next opening ${dateStr}</span>
       </div>`;
     } else if (recs.length > 0) {
-      // Best recommendation
       const best = recs[0];
       const dateStr = best.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       const color = algoColor(best.colorScore);
@@ -2762,7 +2837,6 @@ function buildQueueCard(card) {
         ${prefLabel}${riderMatch}
       </div>`;
 
-      // Second recommendation (alternative)
       if (recs.length > 1 && !recs[1].routesFull) {
         const alt = recs[1];
         const altDateStr = alt.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -2784,9 +2858,10 @@ function buildQueueCard(card) {
     }
   }
 
-  // Expanded content replaced by popover — no expand-below
-
-  const freeBadge = card.rider ? '<span class="free-badge">FREE</span>' : '';
+  // Queued timestamp (below algo reco)
+  const queuedLine = card.queuedAt
+    ? `<div class="qc-queued">Queued: ${new Date(card.queuedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>`
+    : '';
 
   return `<div class="queue-card ${warningClass} ${isSelected ? 'selected' : ''}"
     draggable="true"
@@ -2795,13 +2870,11 @@ function buildQueueCard(card) {
     ondragstart="dragQueueCard(event,'${card.id}')"
     ondragend="endDragQueueCard(event)">
     ${avatarHtml}
-    <div class="qc-title" style="display:flex;align-items:center;gap:6px"><span>${card.name}</span>${freeBadge}</div>
-    <div class="qc-flags">
-      ${quadrant ? `<span class="qc-tag">${quadrant}</span>` : ''}
-      <span class="qc-tag">${rsDisplay}</span>
-      ${shippingTags}
-    </div>
+    <div class="qc-title">${card.name}</div>
+    ${addressLine}
+    <div class="qc-flags">${tagStrip}</div>
     ${algoStrip}
+    ${queuedLine}
   </div>`;
 }
 
@@ -2907,7 +2980,6 @@ function renderRouteSheet() {
       stops.forEach((stop, i) => {
         const isStaged = !stop.committed;
         const isCommitted = !!stop.committed;
-        const flags = (stop.flags || []).map(f => `<span class="stop-flag">${f}</span>`).join('');
 
         const stopDayColor = getDayColor(key.split('-')[0], key);
         const isFirstStop = isCommitted && i === 0;
@@ -2926,9 +2998,22 @@ function renderRouteSheet() {
               </div>`)
           : '';
 
+        // Unified tag strip
+        const stopTagStrip = buildTagStrip(stop, isCommitted ? 'committed' : 'staged');
+
+        // Short address — first segment
+        const stopAddress = stop.address ? stop.address.split(',')[0] : '';
+
+        // Timestamps
+        const stagedTimeHtml = isStaged && stop.stagedAt
+          ? `<span class="staged-time">Staged ${new Date(stop.stagedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span>`
+          : '';
+        const queuedTimeHtml = stop.queuedAt
+          ? `<span class="staged-time" style="opacity:0.65">Queued ${new Date(stop.queuedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>`
+          : '';
+
         html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
-          ${isStaged ? `style="--day-color:${stopDayColor}"` : ''}
-          ${isCommitted ? `style="--day-color:${stopDayColor}"` : ''}
+          style="--day-color:${stopDayColor}"
           onclick="showCardPopover('stop','${stop.cardId || stop.id}',this,'${key}','${truck}',${i})"
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
@@ -2937,18 +3022,14 @@ function renderRouteSheet() {
           ${isCommitted ? committedPfpHtml : `<div class="stop-num" title="Drag to reorder">⠿ ${i+1}</div>`}
           <div class="stop-content">
             <div class="stop-name">${stop.cardName || stop.name}</div>
-            <div class="stop-meta">
-              ${stop.address ? `<span>${stop.address.split(',')[0]}</span>` : ''}
-              ${flags}
-            </div>
+            ${stopAddress ? `<div style="font-size:10px;color:rgba(0,0,0,0.32);margin-top:1px">${stopAddress}</div>` : ''}
+            ${stopTagStrip ? `<div class="qc-flags" style="margin-top:3px">${stopTagStrip}</div>` : ''}
           </div>
           <div class="stop-actions">
-            ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
-            ${isCommitted ? `<button class="stop-btn" onclick="event.stopPropagation();editStop('${key}','${truck}',${i})" title="Edit details">✎</button>` : ''}
+            ${isStaged ? `<button class="stop-check-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">✓</button>` : ''}
             ${isCommitted ? `<button class="stop-btn remove" onclick="event.stopPropagation();removeStop('${key}','${truck}',${i})" title="Uncommit">✕</button>` : ''}
-            ${isStaged ? `<button class="stop-btn" onclick="event.stopPropagation();editStop('${key}','${truck}',${i})" title="Edit">✎</button>` : ''}
           </div>
-          ${isStaged && stop.stagedAt ? `<div class="staged-meta"><span class="staged-by">${stop.stagedBy || ''}</span><span class="staged-time">Staged ${new Date(stop.stagedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span></div>` : ''}
+          ${(stagedTimeHtml || queuedTimeHtml) ? `<div class="staged-meta">${stagedTimeHtml}${queuedTimeHtml}</div>` : ''}
         </div>`;
       });
 
@@ -3138,17 +3219,37 @@ function buildPopoverContent(data, type, dayKey, truck, stopIdx) {
 
 // Map focus: highlight selected dot, dim/stop others
 function focusMapDot(cardId) {
-  // Queue (pending) dots
-  state.unscheduledMarkers?.forEach((m, i) => {
-    const c = state.queueCards[i];
-    if (!c?.coords) return;
+  state.unscheduledMarkers?.forEach((m) => {
+    const mCardId = m._cardId;
     const el = m.getElement();
     if (!el) return;
     const dot = el.querySelector('.unscheduled-pin');
     if (!dot) return;
-    if (c.id === cardId) {
+
+    if (mCardId === cardId) {
+      // Selected — enlarge, show PFP if available
+      const card = state.queueCards.find(c => c.id === mCardId);
       dot.classList.add('selected');
       dot.style.animationPlayState = 'running';
+      dot.style.opacity = '';
+      if (card?.requesterAvatar) {
+        dot.style.width = '30px';
+        dot.style.height = '30px';
+        dot.style.borderRadius = '50%';
+        dot.style.backgroundImage = `url(${card.requesterAvatar})`;
+        dot.style.backgroundSize = 'cover';
+        dot.style.backgroundPosition = 'center';
+        dot.style.border = '2px solid white';
+        dot.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+        dot.style.animation = 'none';
+        dot.style.background = '';
+        // Re-apply background-image since shorthand overrides
+        dot.style.backgroundImage = `url(${card.requesterAvatar})`;
+      } else {
+        dot.style.width = '16px';
+        dot.style.height = '16px';
+        dot.style.transform = 'scale(1.0)';
+      }
     } else {
       dot.classList.remove('selected');
       dot.style.animationPlayState = 'paused';
@@ -3158,7 +3259,7 @@ function focusMapDot(cardId) {
 }
 
 function unfocusMapDots() {
-  state.unscheduledMarkers?.forEach((m, i) => {
+  state.unscheduledMarkers?.forEach((m) => {
     const el = m.getElement();
     if (!el) return;
     const dot = el.querySelector('.unscheduled-pin');
@@ -3166,6 +3267,17 @@ function unfocusMapDots() {
     dot.classList.remove('selected');
     dot.style.animationPlayState = 'running';
     dot.style.opacity = '';
+    // Restore original size and appearance
+    dot.style.width = '';
+    dot.style.height = '';
+    dot.style.borderRadius = '';
+    dot.style.backgroundImage = '';
+    dot.style.backgroundSize = '';
+    dot.style.backgroundPosition = '';
+    dot.style.border = '';
+    dot.style.boxShadow = '';
+    dot.style.animation = '';
+    dot.style.transform = '';
   });
 }
 
@@ -3392,12 +3504,8 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     committed: false,
     stagedAt: Date.now(),
     stagedBy: state.currentUser || '',
+    queuedAt: card.queuedAt || null,
   };
-
-  // Insert into schedule
-  if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
-  if (!state.schedule[dayKey][truck]) state.schedule[dayKey][truck] = [];
-  state.schedule[dayKey][truck].splice(insertPos, 0, newStop);
 
   // Remove from pending queue
   state.queueCards = state.queueCards.filter(c => c.id !== cardId);
@@ -3653,6 +3761,7 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
     committed: false,
     stagedAt: Date.now(),
     stagedBy: state.currentUser || '',
+    queuedAt: card.queuedAt || null,
   };
 
   // Handle first stop lock
@@ -4198,6 +4307,15 @@ async function loadData() {
 
     state.queueCards = processed;
 
+    // Parallel-fetch RFS entry timestamps (FCFS — most recent listAfter=RFS action)
+    await Promise.all(state.queueCards.map(async (card) => {
+      try {
+        const actions = await trello(`/cards/${card.id}/actions?filter=updateCard&limit=30`);
+        const rfsAction = actions.find(a => a.data?.listAfter?.name === 'RFS');
+        card.queuedAt = rfsAction ? rfsAction.date : null;
+      } catch(e) { card.queuedAt = null; }
+    }));
+
     // Remove cards that have been dragged into the schedule (staged or committed)
     const scheduledCardIds = new Set();
     for (const dayKey of Object.keys(state.schedule)) {
@@ -4337,6 +4455,7 @@ async function processCard(card) {
     deliveryNotes: shipping.specialRequest,
     requesterName: requester?.fullName || null,
     requesterAvatar: requester?.avatarUrl ? (requester.avatarUrl + '/50.png') : null,
+    queuedAt: null, // populated after load via fetchQueuedAt()
     flags: [
       shipping.dropOff        && 'DRP',
       !shipping.dropOff && shipping.savedAt && 'WG',
