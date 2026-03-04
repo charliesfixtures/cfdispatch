@@ -1,3 +1,4 @@
+<!-- CF Dispatch · S25 · v1.0 · 2026-03-04 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2288,6 +2289,10 @@ function recommendMultiple(card, limit = 5) {
       score -= capacityBonus;
       colorScore -= capacityBonus;
 
+      // Overflow penalty: full truck must never beat an empty/partial truck on the same day.
+      // Without this, a nearby full Truck A (minDist ~0.3) beats an empty Truck B (~2.0).
+      if (stops.length >= MAX_STOPS) score += 25;
+
       // Empty route = guaranteed green — no roadblocks
       if (stops.length === 0) colorScore = -10;
 
@@ -2518,15 +2523,19 @@ function renderMap() {
         const dateLabel = dayInfo ? dayInfo.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : key;
         const stopOwner = stop.requesterName || stop.salesperson || null;
 
-        // Status line: committed = date, staged = algo %
+        // Status line — salesperson POV vocabulary (locked S21-22)
+        // Committed = "Scheduled MM/DD" · Staged = "MM/DD pct%" (color)
+        const mmS = dayInfo ? String(dayInfo.date.getMonth()+1).padStart(2,'0') : '';
+        const ddS = dayInfo ? String(dayInfo.date.getDate()).padStart(2,'0') : '';
+        const mmddS = mmS && ddS ? `${mmS}/${ddS}` : dateLabel;
         let statusLine;
         if (stop.committed) {
-          statusLine = `<span class="dt-scheduled">● Scheduled · ${dateLabel}</span>`;
+          statusLine = `<span class="dt-scheduled">● Scheduled ${mmddS}</span>`;
         } else {
           const score = stop._colorScore ?? 15;
           const pct = colorScoreToPercent ? colorScoreToPercent(score) : Math.round(99 - (score / 40) * 89);
           const color = pct >= 85 ? '#4c9b3c' : pct >= 50 ? '#c09620' : '#c8553c';
-          statusLine = `<span style="color:${color};font-weight:600">● ${pct}% · ${dateLabel}</span>`;
+          statusLine = `<span style="color:${color};font-weight:600">● ${mmddS} ${pct}%</span>`;
         }
 
         const stopOwnerLine = stopOwner ? `<div class="dt-owner">👤 ${stopOwner}</div>` : "";
@@ -2557,16 +2566,33 @@ function renderMap() {
       const rsInfo = parseRS(card.rsValue);
       const urgency = rsInfo.type === 'asap' ? 'asap' : 'normal';
 
-      // Status: algo % if we have a recommendation
-      const rec = typeof recommend === 'function' ? recommend(card) : null;
+      // Status line — salesperson POV vocabulary (locked S21-22)
+      // ASAP / tomorrow → "Pending · See Manager if Urgent"
+      // 2+ days out    → "Pending MM/DD pct%" (color)
+      // ANY/Flexible   → "Pending"
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0,0,0,0);
       let statusLine;
-      if (rec) {
-        const pct = colorScoreToPercent(rec.colorScore);
-        const color = pct >= 85 ? '#4c9b3c' : pct >= 50 ? '#c09620' : '#c8553c';
-        const allDates = [...getWeekDates(0), ...getWeekDates(1)];
-        const recDay = allDates.find(d => d.key === rec.dayKey);
-        const recLabel = recDay ? recDay.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '';
-        statusLine = `<span style="color:${color};font-weight:600">● ${pct}% · ${recLabel}</span>`;
+      if (rsInfo.type === 'asap') {
+        statusLine = `<span class="dt-pending">● Pending · See Manager if Urgent</span>`;
+      } else if (rsInfo.type === 'date') {
+        const rsDate = new Date(rsInfo.date); rsDate.setHours(0,0,0,0);
+        if (rsDate <= tomorrow) {
+          statusLine = `<span class="dt-pending">● Pending · See Manager if Urgent</span>`;
+        } else {
+          const rec = typeof recommend === 'function' ? recommend(card) : null;
+          if (rec && rec.dayKey) {
+            const pct = colorScoreToPercent(rec.colorScore);
+            const color = pct >= 85 ? '#4c9b3c' : pct >= 50 ? '#c09620' : '#c8553c';
+            const allDates = [...getWeekDates(0), ...getWeekDates(1)];
+            const recDay = allDates.find(d => d.key === rec.dayKey);
+            const recMm = recDay ? String(recDay.date.getMonth()+1).padStart(2,'0') : '';
+            const recDd = recDay ? String(recDay.date.getDate()).padStart(2,'0') : '';
+            const recMmdd = recMm && recDd ? `${recMm}/${recDd}` : '';
+            statusLine = `<span style="color:${color};font-weight:600">● Pending ${recMmdd} ${pct}%</span>`;
+          } else {
+            statusLine = `<span class="dt-pending">● Pending</span>`;
+          }
+        }
       } else {
         statusLine = `<span class="dt-pending">● Pending</span>`;
       }
@@ -3025,12 +3051,12 @@ function renderRouteSheet() {
         const crownHtml = isFirstStop ? '<div class="committed-crown">👑</div>' : '';
         const committedPfpHtml = isCommitted
           ? (stop.requesterAvatar
-            ? `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor}">
+            ? `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor};pointer-events:none">
                 ${crownHtml}
                 <img src="${stop.requesterAvatar}" onerror="this.style.background='#ddd'" />
                 <div class="committed-stop-badge">${i+1}</div>
               </div>`
-            : `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor}">
+            : `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor};pointer-events:none">
                 ${crownHtml}
                 <div class="committed-pfp-fallback">✓</div>
                 <div class="committed-stop-badge">${i+1}</div>
@@ -3211,15 +3237,13 @@ function buildPopoverContent(data, type, dayKey, truck, stopIdx) {
   // Card name
   html += `<div style="font-size:13px;font-weight:700;color:rgba(0,0,0,0.55);margin-bottom:8px">${name}</div>`;
 
-  // Contact info
+  // Contact info — always show rows; empty = nudge salesperson to fill via Power-Up
   html += customerName
     ? `<div class="popover-row"><span class="pop-icon">👤</span> <strong>${customerName}</strong></div>`
-    : `<div class="popover-row" style="color:rgba(0,0,0,0.2)"><span class="pop-icon">👤</span> <em>No contact name</em></div>`;
-
+    : `<div class="popover-row" style="color:rgba(0,0,0,0.28)"><span class="pop-icon">👤</span> <em>No contact name</em></div>`;
   html += customerPhone
     ? `<div class="popover-row"><span class="pop-icon">📞</span> ${customerPhone}</div>`
-    : `<div class="popover-row" style="color:rgba(180,90,40,0.5)"><span class="pop-icon">📞</span> <em>No phone on file</em></div>`;
-
+    : `<div class="popover-row" style="color:rgba(0,0,0,0.28)"><span class="pop-icon">📞</span> <em>No phone on file</em></div>`;
   html += address
     ? `<div class="popover-row"><span class="pop-icon">📍</span> ${address}</div>`
     : `<div class="popover-row" style="color:rgba(180,90,40,0.5)"><span class="pop-icon">📍</span> <em>Address required</em></div>`;
