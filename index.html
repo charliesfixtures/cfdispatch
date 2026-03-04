@@ -1856,11 +1856,14 @@ function stopToQueueCard(stop) {
     requesterAvatar: stop.requesterAvatar,
     rsValue: stop.rsValue,
     firstStopRequested: stop.firstStopRequested,
-    whiteGlove: stop.whiteGlove,
-    equipRemoval: stop.equipRemoval,
-    stairs: stop.stairs,
+    lastStopRequested: stop.lastStopRequested,
     dropoff: stop.dropoff,
+    deliveryMemo: stop.deliveryMemo,
+    deliveryMemoDetail: stop.deliveryMemoDetail,
+    pickUpMemo: stop.pickUpMemo,
+    pickUpMemoDetail: stop.pickUpMemoDetail,
     deliveryNotes: stop.deliveryNotes,
+    flags: stop.flags || [],
     rider: stop.rider,
   };
 }
@@ -2510,10 +2513,7 @@ function buildPopupHTML(stop) {
 
   const tags = [
     stop.firstStopApproved && `<span class="popup-tag first">First Stop</span>`,
-    stop.rs === 'ASAP' && `<span class="popup-tag asap">ASAP</span>`,
-    stop.rs === 'FLEXIBLE' && `<span class="popup-tag flexible">Flexible</span>`,
-    stop.weightGate && `<span class="popup-tag service">Weight Gate</span>`,
-    stop.equipRemoval && `<span class="popup-tag remove">Equip Removal</span>`,
+    ...(stop.flags || []).map(f => `<span class="popup-tag service">${f}</span>`),
   ].filter(Boolean).join('');
 
   return `<div>
@@ -2541,10 +2541,7 @@ function buildPopupHTML(stop) {
 function buildQueuePopupHTML(card) {
   const tags = [
     card.rs && `<span class="popup-tag ${card.rs === 'ASAP' ? 'asap' : card.rs === 'FLEXIBLE' ? 'flexible' : 'service'}">${card.rs}</span>`,
-    card.firstStop && `<span class="popup-tag first">First Stop</span>`,
-    card.weightGate && `<span class="popup-tag service">Weight Gate</span>`,
-    card.equipRemoval && `<span class="popup-tag remove">Equip Removal</span>`,
-    card.stairs && `<span class="popup-tag service">Stairs</span>`,
+    ...(card.flags || []).map(f => `<span class="popup-tag service">${f}</span>`),
   ].filter(Boolean).join('');
 
   return `<div>
@@ -2722,13 +2719,7 @@ function buildQueueCard(card) {
       ? `<div class="qc-expanded-row"><span class="exp-icon">📍</span> ${card.address}</div>`
       : `<div class="qc-expanded-row" style="color:rgba(180,90,40,0.5)"><span class="exp-icon">📍</span> <em>Address required for scheduling</em></div>`;
 
-    const serviceTags = [
-      card.stairs && '🪜 Stairs',
-      card.equipRemoval && '🔧 Removal',
-      card.whiteGlove && '🧤 White Glove',
-      card.firstStopRequested && '🥇 First Stop',
-      card.dropoff && '📦 Drop-Off',
-    ].filter(Boolean);
+    const serviceTags = (card.flags || []).slice();
 
     expandedHtml = `<div class="qc-expanded-content">
       ${nameLine}
@@ -2866,11 +2857,7 @@ function renderRouteSheet() {
       stops.forEach((stop, i) => {
         const isStaged = !stop.committed;
         const isCommitted = !!stop.committed;
-        const flags = [
-          stop.firstStopApproved && '<span class="stop-flag flag-first">1st</span>',
-          stop.whiteGlove && '<span class="stop-flag flag-wg">WG</span>',
-          stop.equipRemoval && '<span class="stop-flag flag-remove">RM</span>',
-        ].filter(Boolean).join('');
+        const flags = (stop.flags || []).map(f => `<span class="stop-flag">${f}</span>`).join('');
 
         const stopDayColor = getDayColor(key.split('-')[0], key);
         const isFirstStop = isCommitted && i === 0;
@@ -3180,11 +3167,15 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     rsValue: card.rsValue,
     firstStopRequested: card.firstStopRequested,
     firstStopApproved: card.firstStopRequested,
-    whiteGlove: card.whiteGlove,
-    equipRemoval: card.equipRemoval,
-    stairs: card.stairs,
+    lastStopRequested: card.lastStopRequested,
     dropoff: card.dropoff,
+    deliveryMemo: card.deliveryMemo,
+    deliveryMemoDetail: card.deliveryMemoDetail,
+    pickUpMemo: card.pickUpMemo,
+    pickUpMemoDetail: card.pickUpMemoDetail,
     deliveryNotes: card.deliveryNotes,
+    flags: card.flags || [],
+    rider: card.rider,
     committed: false,
     stagedAt: Date.now(),
     stagedBy: state.currentUser || '',
@@ -3435,11 +3426,14 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
     firstStopRequested: card.firstStopRequested,
     firstStopApproved: firstStopStatus === 'approved',
     firstStopRevoked: firstStopStatus === 'revoked',
-    whiteGlove: card.whiteGlove,
-    equipRemoval: card.equipRemoval,
-    stairs: card.stairs,
+    lastStopRequested: card.lastStopRequested,
     dropoff: card.dropoff,
+    deliveryMemo: card.deliveryMemo,
+    deliveryMemoDetail: card.deliveryMemoDetail,
+    pickUpMemo: card.pickUpMemo,
+    pickUpMemoDetail: card.pickUpMemoDetail,
     deliveryNotes: card.deliveryNotes,
+    flags: card.flags || [],
     rider: card.rider,
     committed: false,
     stagedAt: Date.now(),
@@ -4099,8 +4093,8 @@ async function processCard(card) {
     if (coords) quadrant = getQuadrant(coords);
   }
 
-  // Parse delivery instructions from card comments (submitted via request form)
-  const commentData = parseDeliveryComment(card.desc || '');
+  // Parse shipping request from pluginData (v0.5+ Power-Up)
+  const shipping = parseShippingPluginData(card.pluginData);
 
   // Card owner (assigned Trello member = salesperson)
   const requester = card.members?.[0] || null;
@@ -4114,20 +4108,26 @@ async function processCard(card) {
     quadrant,
     rsValue: rsField?.value?.text || '',
     invTotal: invField?.value?.number || null,
-    customerName: commentData.customerName,
-    customerPhone: commentData.customerPhone,
-    firstStopRequested: commentData.firstStop,
-    stairs: commentData.stairs,
-    equipRemoval: commentData.removal,
-    whiteGlove: commentData.whiteGlove,
-    dropoff: commentData.dropoff,
-    deliveryNotes: commentData.notes,
+    customerName: shipping.customerName,
+    customerPhone: shipping.customerPhone,
+    firstStopRequested: shipping.firstStop,
+    lastStopRequested: shipping.lastStop,
+    dropoff: shipping.dropOff,
+    deliveryMemo: shipping.deliveryMemo,
+    deliveryMemoDetail: shipping.deliveryMemoDetail,
+    pickUpMemo: shipping.pickUpMemo,
+    pickUpMemoDetail: shipping.pickUpMemoDetail,
+    deliveryNotes: shipping.specialRequest,
     requesterName: requester?.fullName || null,
     requesterAvatar: requester?.avatarUrl ? (requester.avatarUrl + '/50.png') : null,
     flags: [
-      commentData.stairs && '🪜 Stairs',
-      commentData.whiteGlove && '🤍 White Glove',
-      commentData.removal && '🔧 Removal',
+      shipping.dropOff        && '📦 Drop',
+      !shipping.dropOff && shipping.savedAt && '🧤 Glove',
+      shipping.firstStop      && '🥇 1st',
+      shipping.lastStop       && '🏁 Last',
+      shipping.deliveryMemo   && '📋 Delivery',
+      shipping.pickUpMemo     && '♻️ Pick-up',
+      shipping.specialRequest && '📝 Note',
     ].filter(Boolean),
   };
 }
@@ -4140,18 +4140,48 @@ function getQuadrant(coords) {
   return Math.abs(dLat) < 0.02 && Math.abs(dLng) < 0.02 ? 'LOCAL' : `${ns}${ew}`;
 }
 
-function parseDeliveryComment(text) {
-  // Parse structured comment from request.html
-  return {
-    customerName: text.match(/👤 Customer: (.+)/)?.[1]?.trim() || null,
-    customerPhone: text.match(/📞 Phone: (.+)/)?.[1]?.trim() || null,
-    firstStop: text.includes('FIRST STOP REQUESTED'),
-    stairs: text.includes('☑ Stairs'),
-    removal: text.includes('☑ Equipment Removal'),
-    whiteGlove: text.includes('☑ White Glove'),
-    dropoff: text.includes('☑ Drop-off'),
-    notes: text.match(/📝 Notes: (.+)/)?.[1]?.trim() || null,
+// ════════════════════════════════════════════════════════
+// Parse shipping request from Trello pluginData
+// Power-Up writes: t.set('card','shared','shippingRequest', data)
+// REST API returns: card.pluginData[].value = JSON with shippingRequest key
+// ════════════════════════════════════════════════════════
+function parseShippingPluginData(pluginData) {
+  const empty = {
+    customerName: null, customerPhone: null,
+    firstStop: false, lastStop: false, dropOff: false,
+    deliveryMemo: false, deliveryMemoDetail: '',
+    pickUpMemo: false, pickUpMemoDetail: '',
+    specialRequest: '', savedAt: null,
   };
+
+  if (!pluginData || !Array.isArray(pluginData)) return empty;
+
+  // Scan all plugin entries for our shippingRequest key
+  for (const entry of pluginData) {
+    try {
+      const val = typeof entry.value === 'string' ? JSON.parse(entry.value) : entry.value;
+      if (val && val.shippingRequest) {
+        const sr = typeof val.shippingRequest === 'string' ? JSON.parse(val.shippingRequest) : val.shippingRequest;
+        return {
+          customerName: sr.customerName || null,
+          customerPhone: sr.customerPhone || null,
+          firstStop: !!sr.firstStop,
+          lastStop: !!sr.lastStop,
+          dropOff: !!sr.dropOff,
+          deliveryMemo: !!sr.deliveryMemo,
+          deliveryMemoDetail: sr.deliveryMemoDetail || '',
+          pickUpMemo: !!sr.pickUpMemo,
+          pickUpMemoDetail: sr.pickUpMemoDetail || '',
+          specialRequest: sr.specialRequest || '',
+          savedAt: sr.savedAt || null,
+        };
+      }
+    } catch (e) {
+      console.warn('pluginData parse error:', e);
+    }
+  }
+
+  return empty;
 }
 
 async function loadScheduledCards() {
