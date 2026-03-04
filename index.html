@@ -3510,6 +3510,11 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     queuedAt: card.queuedAt || null,
   };
 
+  // Insert into schedule
+  if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
+  if (!state.schedule[dayKey][truck]) state.schedule[dayKey][truck] = [];
+  state.schedule[dayKey][truck].splice(insertPos, 0, newStop);
+
   // Remove from pending queue
   state.queueCards = state.queueCards.filter(c => c.id !== cardId);
 
