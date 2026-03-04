@@ -260,9 +260,7 @@ body {
   background: rgba(240,201,58,0.08);
 }
 
-.queue-card.expanded {
-  background: rgba(170,165,155,0.45);
-}
+/* Queue card popover replaces expand-below */
 
 /* Warning border removed — amber algo strip text is sufficient cue */
 .queue-card.has-warning { }
@@ -317,12 +315,68 @@ body {
   font-family: 'Inter Tight', sans-serif;
 }
 
-/* Expanded card content */
-.qc-expanded-content {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(0,0,0,0.06);
+/* Expanded card content — legacy, kept for reference */
+.qc-expanded-content { display: none; }
+
+/* Card detail popover */
+.card-popover {
+  position: fixed;
+  z-index: 800;
+  width: 280px;
+  background: rgba(200,195,185,0.85);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5);
   font-family: 'Inter Tight', sans-serif;
+  pointer-events: all;
+  animation: popoverIn 0.15s ease;
+}
+@keyframes popoverIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.popover-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11.5px;
+  color: rgba(0,0,0,0.45);
+  padding: 3px 0;
+  font-family: 'Inter Tight', sans-serif;
+}
+.popover-row .pop-icon {
+  font-size: 12px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.popover-row strong {
+  color: rgba(0,0,0,0.55);
+  font-weight: 600;
+}
+.popover-row em {
+  font-style: italic;
+}
+.popover-divider {
+  height: 1px;
+  background: rgba(0,0,0,0.06);
+  margin: 6px 0;
+}
+.popover-note {
+  font-size: 11px;
+  color: rgba(0,0,0,0.38);
+  font-style: italic;
+  padding: 3px 0;
+  line-height: 1.4;
+}
+.popover-rider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 0 0;
 }
 .qc-expanded-row {
   display: flex;
@@ -1615,6 +1669,7 @@ body {
 .popup-driver-phone { font-size: 11px; color: rgba(0,0,0,0.38); margin-top: 1px; }
 .popup-link { font-size: 11px; color: rgba(240,201,58,0.8); text-decoration: none; margin-top: 8px; display: inline-block; transition: color 0.15s; }
 .popup-link:hover { color: #f0c93a; text-decoration: underline; }
+.popup-status { font-size: 11.5px; margin: 4px 0 6px 0; font-family: 'Inter Tight', sans-serif; }
 </style>
 </head>
 <body>
@@ -1898,6 +1953,7 @@ let state = {
   activeRightDay: 'MON-W1',
   pendingSuggestion: null,
   expandedCard: null,
+  popoverTarget: null,  // { type: 'queue'|'stop', id, dayKey?, truck?, index?, el? }
   lockedTrucks: {},      // { 'MON-W1-A': true }
   showTruckB: false,     // hidden by default — Truck A only at start
   showTruckC: false,     // hidden by default
@@ -2504,58 +2560,80 @@ function updateRouteAnimation() {
 }
 
 function buildPopupHTML(stop) {
-  // Find which driver is assigned to this stop
-  const dayKey = stop.dayKey || state.activeRightDay;
-  const truck = stop.truck || '';
-  const driver = getDriverForTruck(dayKey, truck)
-    || state.drivers?.find(d => d.id === stop.driverId);
-  const driverFirstName = driver?.name?.split(' ')[0]?.toLowerCase() || '';
+  // Scheduled stop popup — salesperson-friendly
+  const isCommitted = !!stop.committed;
 
-  const tags = [
-    stop.firstStopApproved && `<span class="popup-tag first">First Stop</span>`,
-    ...(stop.flags || []).map(f => `<span class="popup-tag service">${f}</span>`),
-  ].filter(Boolean).join('');
+  // Find which day this stop is on for date display
+  const dayKey = stop.dayKey || state.activeRightDay;
+  const dates = [...getWeekDates(0), ...getWeekDates(1)];
+  const dayInfo = dates.find(d => d.key === dayKey);
+  const dateStr = dayInfo ? `${String(dayInfo.date.getMonth()+1).padStart(2,'0')}/${String(dayInfo.date.getDate()).padStart(2,'0')}` : '';
+
+  let statusHtml = '';
+  if (isCommitted) {
+    statusHtml = `<div class="popup-status" style="color:rgba(76,155,60,0.85);font-weight:700">Scheduled ${dateStr}</div>`;
+  } else {
+    // Staged — show algo probability
+    const score = stop._colorScore ?? 10;
+    const pct = colorScoreToPercent(score);
+    const color = pct >= 85 ? 'rgba(76,155,60,0.85)' : pct >= 50 ? 'rgba(190,150,40,0.8)' : 'rgba(200,85,60,0.8)';
+    statusHtml = `<div class="popup-status" style="color:${color};font-weight:700">${dateStr} ${pct}%</div>`;
+  }
 
   return `<div>
-    ${driver ? `
-    <div class="popup-driver-row">
-      <img class="popup-driver-img" src="assets/${driverFirstName}.png" onerror="this.style.display='none'" alt="${driver.name}" />
-      <div class="popup-driver-info">
-        <div class="popup-driver-name">${driver.name}</div>
-        <div class="popup-driver-phone">${driver.phone || 'No phone on file'}</div>
-      </div>
-    </div>` : ''}
     <div class="popup-title">${stop.cardName || stop.name}</div>
-    ${stop.address ? `<div class="popup-row"><span class="popup-icon">📍</span><strong>${stop.address}</strong></div>` : ''}
-    <div class="popup-divider"></div>
     ${stop.customerName ? `<div class="popup-row"><span class="popup-icon">👤</span> ${stop.customerName}</div>` : ''}
-    ${stop.customerPhone ? `<div class="popup-row"><span class="popup-icon">📞</span> <strong>${stop.customerPhone}</strong></div>` : '<div class="popup-row" style="opacity:0.3">📞 No contact on file</div>'}
-    ${stop.salesperson ? `<div class="popup-row"><span class="popup-icon">🧑‍💼</span> ${stop.salesperson}</div>` : ''}
-    ${stop.invTotal ? `<div class="popup-row"><span class="popup-icon">💰</span> $${parseFloat(stop.invTotal).toLocaleString()}</div>` : ''}
-    ${tags ? `<div style="margin-top:8px;">${tags}</div>` : ''}
-    ${stop.notes ? `<div class="popup-divider"></div><div class="popup-row" style="font-style:italic;opacity:0.7">💬 ${stop.notes}</div>` : ''}
+    ${stop.customerPhone ? `<div class="popup-row"><span class="popup-icon">📞</span> ${stop.customerPhone}</div>` : ''}
+    ${stop.address ? `<div class="popup-row"><span class="popup-icon">📍</span> ${stop.address}</div>` : ''}
+    <div class="popup-divider"></div>
+    ${statusHtml}
     <a class="popup-link" href="https://trello.com/c/${stop.cardShortId || stop.shortLink}" target="_blank">Open in Trello →</a>
   </div>`;
 }
 
 function buildQueuePopupHTML(card) {
-  const tags = [
-    card.rs && `<span class="popup-tag ${card.rs === 'ASAP' ? 'asap' : card.rs === 'FLEXIBLE' ? 'flexible' : 'service'}">${card.rs}</span>`,
-    ...(card.flags || []).map(f => `<span class="popup-tag service">${f}</span>`),
-  ].filter(Boolean).join('');
+  // Pending card popup — salesperson-friendly
+  const rsInfo = parseRS(card.rsValue);
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0,0,0,0);
+
+  let statusHtml = '';
+  if (rsInfo.type === 'asap') {
+    statusHtml = `<div class="popup-status" style="color:rgba(200,85,60,0.8);font-weight:700">Pending · See Manager if Urgent</div>`;
+  } else if (rsInfo.type === 'date') {
+    const rsDate = new Date(rsInfo.date); rsDate.setHours(0,0,0,0);
+    const dateStr = `${String(rsDate.getMonth()+1).padStart(2,'0')}/${String(rsDate.getDate()).padStart(2,'0')}`;
+    if (rsDate <= tomorrow) {
+      statusHtml = `<div class="popup-status" style="color:rgba(200,85,60,0.8);font-weight:700">Pending · See Manager if Urgent</div>`;
+    } else {
+      // 2+ days out — show algo score
+      const rec = recommend(card);
+      const pct = rec ? colorScoreToPercent(rec.colorScore) : 50;
+      const color = pct >= 85 ? 'rgba(76,155,60,0.85)' : pct >= 50 ? 'rgba(190,150,40,0.8)' : 'rgba(200,85,60,0.8)';
+      statusHtml = `<div class="popup-status" style="color:${color};font-weight:700">Pending ${dateStr} ${pct}%</div>`;
+    }
+  } else {
+    // ANY/Flexible/empty
+    statusHtml = `<div class="popup-status" style="color:rgba(0,0,0,0.35);font-weight:600">Pending</div>`;
+  }
 
   return `<div>
     <div class="popup-title">${card.name}</div>
-    ${card.address ? `<div class="popup-row"><span class="popup-icon">📍</span> <strong>${card.address}</strong></div>` : ''}
-    <div class="popup-divider"></div>
     ${card.customerName ? `<div class="popup-row"><span class="popup-icon">👤</span> ${card.customerName}</div>` : ''}
-    ${card.customerPhone ? `<div class="popup-row"><span class="popup-icon">📞</span> <strong>${card.customerPhone}</strong></div>` : '<div class="popup-row" style="opacity:0.3">📞 No contact on file</div>'}
-    ${card.salesperson ? `<div class="popup-row"><span class="popup-icon">🧑‍💼</span> ${card.salesperson}</div>` : ''}
-    ${card.invTotal ? `<div class="popup-row"><span class="popup-icon">💰</span> $${parseFloat(card.invTotal).toLocaleString()}</div>` : ''}
-    ${tags ? `<div style="margin-top:8px;">${tags}</div>` : ''}
-    ${card.notes ? `<div class="popup-divider"></div><div class="popup-row" style="font-style:italic;opacity:0.7">💬 ${card.notes}</div>` : ''}
+    ${card.customerPhone ? `<div class="popup-row"><span class="popup-icon">📞</span> ${card.customerPhone}</div>` : ''}
+    ${card.address ? `<div class="popup-row"><span class="popup-icon">📍</span> ${card.address}</div>` : ''}
+    <div class="popup-divider"></div>
+    ${statusHtml}
     <a class="popup-link" href="https://trello.com/c/${card.shortLink}" target="_blank">Open in Trello →</a>
   </div>`;
+}
+
+// Convert colorScore to percentage (lower score = higher probability)
+function colorScoreToPercent(score) {
+  if (score <= 0) return 99;
+  if (score >= 40) return 10;
+  // Linear mapping: 0 → 99%, 40 → 10%
+  const pct = Math.round(99 - (score / 40) * 89);
+  return Math.max(10, Math.min(99, pct));
 }
 
 // ════════════════════════════════════════════════════════
@@ -2604,7 +2682,6 @@ function renderQueue() {
 
 function buildQueueCard(card) {
   const isSelected = state.selectedCard?.id === card.id;
-  const isExpanded = state.expandedCard === card.id;
   const warningClass = (!card.address || !card.coords) ? 'has-warning' : (!card.requesterName ? 'has-warning' : '');
 
   // Avatar (card owner / salesperson)
@@ -2619,12 +2696,15 @@ function buildQueueCard(card) {
   // Tags — monotone
   const quadrant = card.quadrant || '';
   const rsInfo = parseRS(card.rsValue);
-  let rsDisplay = 'Flexible';
+  let rsDisplay = 'ANY';
   if (rsInfo.type === 'asap') rsDisplay = 'ASAP';
-  else if (rsInfo.type === 'date') rsDisplay = rsInfo.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  else if (rsInfo.type === 'past') rsDisplay = '⚠ Past date';
-  else if (rsInfo.type === 'flexible') rsDisplay = 'Flexible';
+  else if (rsInfo.type === 'date') rsDisplay = `${String(rsInfo.date.getMonth()+1).padStart(2,'0')}/${String(rsInfo.date.getDate()).padStart(2,'0')}`;
+  else if (rsInfo.type === 'past') rsDisplay = '⚠ Past';
+  else if (rsInfo.type === 'flexible' || rsInfo.type === 'empty') rsDisplay = 'ANY';
   else if (card.rsValue && card.rsValue !== '') rsDisplay = card.rsValue;
+
+  // Shipping flags — fixed order: [QUAD] [RS] [WG/DRP] [1ST/LST] [D] [P] [⚠️]
+  const shippingTags = (card.flags || []).map(f => `<span class="qc-tag">${f}</span>`).join('');
 
   // Algo strip — show top 2 recommendations with RS context
   let algoStrip = '';
@@ -2704,43 +2784,13 @@ function buildQueueCard(card) {
     }
   }
 
-  // Expanded content with graceful fallbacks
-  let expandedHtml = '';
-  if (isExpanded) {
-    const nameLine = card.customerName
-      ? `<div class="qc-expanded-row"><span class="exp-icon">👤</span> <strong>${card.customerName}</strong></div>`
-      : `<div class="qc-expanded-row" style="color:rgba(0,0,0,0.25)"><span class="exp-icon">👤</span> <em>No customer name</em></div>`;
-
-    const phoneLine = card.customerPhone
-      ? `<div class="qc-expanded-row"><span class="exp-icon">📞</span> ${card.customerPhone}</div>`
-      : `<div class="qc-expanded-row" style="color:rgba(180,90,40,0.5)"><span class="exp-icon">📞</span> <em>Contact info needed — update in Trello</em></div>`;
-
-    const addressLine = card.address
-      ? `<div class="qc-expanded-row"><span class="exp-icon">📍</span> ${card.address}</div>`
-      : `<div class="qc-expanded-row" style="color:rgba(180,90,40,0.5)"><span class="exp-icon">📍</span> <em>Address required for scheduling</em></div>`;
-
-    const serviceTags = (card.flags || []).slice();
-
-    expandedHtml = `<div class="qc-expanded-content">
-      ${nameLine}
-      ${phoneLine}
-      ${addressLine}
-      ${card.invTotal ? `<div class="qc-expanded-row"><span class="exp-icon">💰</span> $${parseFloat(card.invTotal).toLocaleString()}</div>` : ''}
-      ${serviceTags.length ? `<div class="qc-expanded-tags">${serviceTags.map(t => `<span class="exp-tag">${t}</span>`).join('')}</div>` : ''}
-      ${card.deliveryNotes ? `<div class="qc-expanded-divider"></div><div class="qc-expanded-row" style="font-style:italic;opacity:0.7"><span class="exp-icon">💬</span> ${card.deliveryNotes}</div>` : ''}
-      <div class="qc-expanded-divider"></div>
-      <div class="qc-expanded-row" style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:10px;color:rgba(0,0,0,0.4)">Free delivery (ride-along)</span>
-        <span class="free-toggle ${card.rider ? 'active' : ''}" onclick="event.stopPropagation();toggleRider('${card.id}')">${card.rider ? '✓ FREE' : 'Mark free'}</span>
-      </div>
-    </div>`;
-  }
+  // Expanded content replaced by popover — no expand-below
 
   const freeBadge = card.rider ? '<span class="free-badge">FREE</span>' : '';
 
-  return `<div class="queue-card ${warningClass} ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}"
+  return `<div class="queue-card ${warningClass} ${isSelected ? 'selected' : ''}"
     draggable="true"
-    onclick="toggleExpandCard('${card.id}')"
+    onclick="showCardPopover('queue','${card.id}',this)"
     ondblclick="window.open('https://trello.com/c/${card.shortLink}','_blank')"
     ondragstart="dragQueueCard(event,'${card.id}')"
     ondragend="endDragQueueCard(event)">
@@ -2749,9 +2799,9 @@ function buildQueueCard(card) {
     <div class="qc-flags">
       ${quadrant ? `<span class="qc-tag">${quadrant}</span>` : ''}
       <span class="qc-tag">${rsDisplay}</span>
+      ${shippingTags}
     </div>
     ${algoStrip}
-    ${expandedHtml}
   </div>`;
 }
 
@@ -2879,6 +2929,7 @@ function renderRouteSheet() {
         html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="true"
           ${isStaged ? `style="--day-color:${stopDayColor}"` : ''}
           ${isCommitted ? `style="--day-color:${stopDayColor}"` : ''}
+          onclick="showCardPopover('stop','${stop.cardId || stop.id}',this,'${key}','${truck}',${i})"
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
@@ -2893,9 +2944,9 @@ function renderRouteSheet() {
           </div>
           <div class="stop-actions">
             ${isStaged ? `<button class="stop-commit-btn" onclick="event.stopPropagation();commitSingleCard('${key}','${truck}',${i})" title="Commit to Trello">Commit</button>` : ''}
-            ${isCommitted ? `<button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit details">✎</button>` : ''}
-            ${isCommitted ? `<button class="stop-btn remove" onclick="removeStop('${key}','${truck}',${i})" title="Uncommit">✕</button>` : ''}
-            ${isStaged ? `<button class="stop-btn" onclick="editStop('${key}','${truck}',${i})" title="Edit">✎</button>` : ''}
+            ${isCommitted ? `<button class="stop-btn" onclick="event.stopPropagation();editStop('${key}','${truck}',${i})" title="Edit details">✎</button>` : ''}
+            ${isCommitted ? `<button class="stop-btn remove" onclick="event.stopPropagation();removeStop('${key}','${truck}',${i})" title="Uncommit">✕</button>` : ''}
+            ${isStaged ? `<button class="stop-btn" onclick="event.stopPropagation();editStop('${key}','${truck}',${i})" title="Edit">✎</button>` : ''}
           </div>
           ${isStaged && stop.stagedAt ? `<div class="staged-meta"><span class="staged-by">${stop.stagedBy || ''}</span><span class="staged-time">Staged ${new Date(stop.stagedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span></div>` : ''}
         </div>`;
@@ -2938,16 +2989,157 @@ function toggleRider(cardId) {
   }
 }
 
-function toggleExpandCard(cardId) {
-  const card = state.queueCards.find(c => c.id === cardId);
-  if (!card) return;
+// ════════════════════════════════════════════════════════
+// CARD DETAIL POPOVER
+// ════════════════════════════════════════════════════════
+function showCardPopover(type, cardId, anchorEl, dayKey, truck, stopIdx) {
+  event?.stopPropagation?.();
 
-  // Toggle expanded state
-  state.expandedCard = state.expandedCard === cardId ? null : cardId;
-  state.selectedCard = card;
+  // Close if same card clicked again
+  if (state.popoverTarget?.id === cardId && state.popoverTarget?.type === type &&
+      state.popoverTarget?.dayKey === dayKey && state.popoverTarget?.truck === truck) {
+    hideCardPopover();
+    return;
+  }
 
-  // Pulse the map dot
-  state.unscheduledMarkers.forEach((m, i) => {
+  hideCardPopover();
+
+  // Find the data source
+  let data = null;
+  let isQueue = type === 'queue';
+
+  if (isQueue) {
+    data = state.queueCards.find(c => c.id === cardId);
+  } else {
+    const stops = state.schedule[dayKey]?.[truck] || [];
+    data = stops[stopIdx];
+  }
+  if (!data) return;
+
+  state.popoverTarget = { type, id: cardId, dayKey, truck, index: stopIdx };
+  state.selectedCard = isQueue ? data : { id: cardId, coords: data.coords };
+
+  // Focus map on this card/stop
+  if (data.coords) {
+    map.panTo([data.coords.lat, data.coords.lng], { animate: true, duration: 0.5 });
+    map.closePopup();
+  }
+
+  // Pulse only the selected dot, dim others
+  focusMapDot(cardId);
+
+  // Build popover content
+  const popover = document.createElement('div');
+  popover.className = 'card-popover';
+  popover.id = 'card-popover';
+  popover.onclick = (e) => e.stopPropagation();
+  popover.innerHTML = buildPopoverContent(data, type, dayKey, truck, stopIdx);
+
+  document.body.appendChild(popover);
+
+  // Position: right of anchor for left panel, left of anchor for right panel
+  const rect = anchorEl.getBoundingClientRect();
+  const popW = 280;
+  const popH = popover.offsetHeight;
+  let left, top;
+
+  if (isQueue) {
+    // Float RIGHT of the queue card
+    left = rect.right + 8;
+    top = rect.top;
+  } else {
+    // Float LEFT of the stop card
+    left = rect.left - popW - 8;
+    top = rect.top;
+  }
+
+  // Viewport clamping
+  if (left + popW > window.innerWidth - 16) left = rect.left - popW - 8;
+  if (left < 16) left = rect.right + 8;
+  if (top + popH > window.innerHeight - 16) top = window.innerHeight - popH - 16;
+  if (top < 16) top = 16;
+
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+
+  // Re-render queue to update selected state
+  renderQueue();
+  updateRouteAnimation();
+}
+
+function hideCardPopover() {
+  const existing = document.getElementById('card-popover');
+  if (existing) existing.remove();
+  state.popoverTarget = null;
+  unfocusMapDots();
+}
+
+function buildPopoverContent(data, type, dayKey, truck, stopIdx) {
+  const isQueue = type === 'queue';
+  const name = data.cardName || data.name || '';
+  const customerName = data.customerName || null;
+  const customerPhone = data.customerPhone || null;
+  const address = data.address || null;
+  const invTotal = data.invTotal || null;
+  const deliveryMemoDetail = data.deliveryMemoDetail || '';
+  const pickUpMemoDetail = data.pickUpMemoDetail || '';
+  const deliveryNotes = data.deliveryNotes || '';
+
+  let html = '';
+
+  // Card name
+  html += `<div style="font-size:13px;font-weight:700;color:rgba(0,0,0,0.55);margin-bottom:8px">${name}</div>`;
+
+  // Contact info
+  html += customerName
+    ? `<div class="popover-row"><span class="pop-icon">👤</span> <strong>${customerName}</strong></div>`
+    : `<div class="popover-row" style="color:rgba(0,0,0,0.2)"><span class="pop-icon">👤</span> <em>No contact name</em></div>`;
+
+  html += customerPhone
+    ? `<div class="popover-row"><span class="pop-icon">📞</span> ${customerPhone}</div>`
+    : `<div class="popover-row" style="color:rgba(180,90,40,0.5)"><span class="pop-icon">📞</span> <em>No phone on file</em></div>`;
+
+  html += address
+    ? `<div class="popover-row"><span class="pop-icon">📍</span> ${address}</div>`
+    : `<div class="popover-row" style="color:rgba(180,90,40,0.5)"><span class="pop-icon">📍</span> <em>Address required</em></div>`;
+
+  if (invTotal) {
+    html += `<div class="popover-row"><span class="pop-icon">💰</span> $${parseFloat(invTotal).toLocaleString()}</div>`;
+  }
+
+  // Memo details (the actual text, not just tags)
+  if (deliveryMemoDetail || pickUpMemoDetail || deliveryNotes) {
+    html += `<div class="popover-divider"></div>`;
+    if (deliveryMemoDetail) {
+      html += `<div class="popover-row"><span class="pop-icon">📋</span> <span>${deliveryMemoDetail}</span></div>`;
+    }
+    if (pickUpMemoDetail) {
+      html += `<div class="popover-row"><span class="pop-icon">♻️</span> <span>${pickUpMemoDetail}</span></div>`;
+    }
+    if (deliveryNotes) {
+      html += `<div class="popover-row"><span class="pop-icon">📝</span> <span>${deliveryNotes}</span></div>`;
+    }
+  }
+
+  // Rider toggle — queue only
+  if (isQueue) {
+    const card = state.queueCards.find(c => c.id === (data.id || data.cardId));
+    if (card) {
+      html += `<div class="popover-divider"></div>`;
+      html += `<div class="popover-rider-row">
+        <span style="font-size:10px;color:rgba(0,0,0,0.4)">Free delivery (ride-along)</span>
+        <span class="free-toggle ${card.rider ? 'active' : ''}" onclick="event.stopPropagation();toggleRider('${card.id}');hideCardPopover()">${card.rider ? '✓ FREE' : 'Mark free'}</span>
+      </div>`;
+    }
+  }
+
+  return html;
+}
+
+// Map focus: highlight selected dot, dim/stop others
+function focusMapDot(cardId) {
+  // Queue (pending) dots
+  state.unscheduledMarkers?.forEach((m, i) => {
     const c = state.queueCards[i];
     if (!c?.coords) return;
     const el = m.getElement();
@@ -2956,17 +3148,37 @@ function toggleExpandCard(cardId) {
     if (!dot) return;
     if (c.id === cardId) {
       dot.classList.add('selected');
-      map.panTo([c.coords.lat, c.coords.lng], { animate: true, duration: 0.5 });
+      dot.style.animationPlayState = 'running';
     } else {
       dot.classList.remove('selected');
+      dot.style.animationPlayState = 'paused';
+      dot.style.opacity = '0.3';
     }
   });
-
-  renderQueue();
-  updateRouteAnimation();
 }
 
+function unfocusMapDots() {
+  state.unscheduledMarkers?.forEach((m, i) => {
+    const el = m.getElement();
+    if (!el) return;
+    const dot = el.querySelector('.unscheduled-pin');
+    if (!dot) return;
+    dot.classList.remove('selected');
+    dot.style.animationPlayState = 'running';
+    dot.style.opacity = '';
+  });
+}
+
+// Click outside to dismiss popover
+document.addEventListener('click', (e) => {
+  if (state.popoverTarget && !e.target.closest('.card-popover') && !e.target.closest('.queue-card') && !e.target.closest('.stop-item')) {
+    hideCardPopover();
+    renderQueue();
+  }
+});
+
 function dragQueueCard(e, cardId) {
+  hideCardPopover();
   e.dataTransfer.setData('text/plain', cardId);
   e.dataTransfer.effectAllowed = 'move';
   e.target.classList.add('dragging');
@@ -3176,6 +3388,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     deliveryNotes: card.deliveryNotes,
     flags: card.flags || [],
     rider: card.rider,
+    _colorScore: (() => { const r = recommend(card); return r ? r.colorScore : 15; })(),
     committed: false,
     stagedAt: Date.now(),
     stagedBy: state.currentUser || '',
@@ -3199,6 +3412,7 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
 
 // ── PER-CARD COMMIT TO TRELLO ──
 async function commitSingleCard(dayKey, truck, stopIndex) {
+  hideCardPopover();
   const stops = state.schedule[dayKey]?.[truck];
   if (!stops || !stops[stopIndex]) return;
 
@@ -3435,6 +3649,7 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
     deliveryNotes: card.deliveryNotes,
     flags: card.flags || [],
     rider: card.rider,
+    _colorScore: (() => { const r = recommend(card); return r ? r.colorScore : 15; })(),
     committed: false,
     stagedAt: Date.now(),
     stagedBy: state.currentUser || '',
@@ -3501,6 +3716,7 @@ function permutations(arr) {
 }
 
 function removeStop(dayKey, truck, idx) {
+  hideCardPopover();
   const stop = state.schedule[dayKey]?.[truck]?.[idx];
   if (!stop) return;
 
@@ -3563,6 +3779,7 @@ function editStop(dayKey, truck, idx) {
 let dragData = null;
 
 function dragStop(e, dayKey, truck, idx) {
+  hideCardPopover();
   dragData = { dayKey, truck, idx };
   e.dataTransfer.effectAllowed = 'move';
 }
@@ -4121,13 +4338,13 @@ async function processCard(card) {
     requesterName: requester?.fullName || null,
     requesterAvatar: requester?.avatarUrl ? (requester.avatarUrl + '/50.png') : null,
     flags: [
-      shipping.dropOff        && '📦 Drop',
-      !shipping.dropOff && shipping.savedAt && '🧤 Glove',
-      shipping.firstStop      && '🥇 1st',
-      shipping.lastStop       && '🏁 Last',
-      shipping.deliveryMemo   && '📋 Delivery',
-      shipping.pickUpMemo     && '♻️ Pick-up',
-      shipping.specialRequest && '📝 Note',
+      shipping.dropOff        && 'DRP',
+      !shipping.dropOff && shipping.savedAt && 'WG',
+      shipping.firstStop      && '1ST',
+      shipping.lastStop       && 'LST',
+      shipping.deliveryMemo   && 'D',
+      shipping.pickUpMemo     && 'P',
+      shipping.specialRequest && '⚠️',
     ].filter(Boolean),
   };
 }
