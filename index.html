@@ -2527,6 +2527,13 @@ function renderMap() {
           .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
           .addTo(map);
 
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          stop.dayKey = key;
+          const popupHtml = buildPopupHTML(stop);
+          marker.bindPopup(popupHtml, { maxWidth: 280, className: 'dispatch-popup' }).openPopup();
+        });
+
         if (!state.mapMarkers[key]) state.mapMarkers[key] = [];
         state.mapMarkers[key].push(marker);
       });
@@ -2544,6 +2551,16 @@ function renderMap() {
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
       marker._cardId = card.id;
+
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        // Select card and focus PFP without losing it to the document click handler
+        state.selectedCard = card;
+        focusMapDot(card.id);
+        // Open full-detail popup
+        const popupHtml = buildQueuePopupHTML(card);
+        marker.bindPopup(popupHtml, { maxWidth: 280, className: 'dispatch-popup' }).openPopup();
+      });
       state.unscheduledMarkers.push(marker);
     });
   updateRouteAnimation();
