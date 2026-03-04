@@ -2542,7 +2542,8 @@ function renderMap() {
         const stopCustomerLine = stop.customerName ? `<div class="dt-owner">🏢 ${stop.customerName}</div>` : '';
         const stopPhoneLine = stop.customerPhone ? `<div class="dt-owner">📞 ${stop.customerPhone}</div>` : '';
         const stopAddressLine = stop.address ? `<div class="dt-owner">📍 ${stop.address.split(',').slice(0,2).join(',')}</div>` : '';
-        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopCustomerLine}${stopOwnerLine}${stopPhoneLine}${stopAddressLine}<div class="dt-status">${statusLine}</div>`;
+        // Row order: Card Name → Customer → Phone → Address → Salesperson (card owner)
+        const stopTipHtml = `<div class="dt-name">${stop.name}</div>${stopCustomerLine}${stopPhoneLine}${stopAddressLine}${stopOwnerLine}<div class="dt-status">${statusLine}</div>`;
 
         const marker = L.marker([stop.coords.lat, stop.coords.lng], { icon })
           .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
@@ -2562,6 +2563,7 @@ function renderMap() {
       const addressLine = card.address ? `<div class="dt-owner">📍 ${card.address.split(',').slice(0,2).join(',')}</div>` : '';
       const phoneLine = card.customerPhone ? `<div class="dt-owner">📞 ${card.customerPhone}</div>` : '';
       const customerLine = card.customerName ? `<div class="dt-owner">🏢 ${card.customerName}</div>` : '';
+      // Row order: Card Name → Customer → Phone → Address → Salesperson (card owner)
 
       const rsInfo = parseRS(card.rsValue);
       const urgency = rsInfo.type === 'asap' ? 'asap' : 'normal';
@@ -2597,7 +2599,8 @@ function renderMap() {
         statusLine = `<span class="dt-pending">● Pending</span>`;
       }
 
-      const tipHtml = `<div class="dt-name">${card.name}</div>${customerLine}${ownerLine}${phoneLine}${addressLine}<div class="dt-status">${statusLine}</div>`;
+      // Row order: Card Name → Customer → Phone → Address → Salesperson (card owner)
+      const tipHtml = `<div class="dt-name">${card.name}</div>${customerLine}${phoneLine}${addressLine}${ownerLine}<div class="dt-status">${statusLine}</div>`;
       const marker = L.marker([card.coords.lat, card.coords.lng], { icon: createUnscheduledPin(urgency) })
         .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
         .addTo(map);
