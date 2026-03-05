@@ -4109,17 +4109,9 @@ function handleQueueDrop(e) {
 
 function toggleTruckB() {
   state.showTruckB = !state.showTruckB;
-  const btnB = document.getElementById('truck-b-btn');
-  const btnC = document.getElementById('truck-c-btn');
-  if (state.showTruckB) {
-    if (btnB) btnB.style.display = 'none';
-    if (btnC) btnC.style.display = 'block';
-  } else {
-    if (btnB) btnB.style.display = 'block';
-    if (btnC) btnC.style.display = 'none';
-    state.showTruckC = false; // removing B also removes C
-  }
+  if (!state.showTruckB) state.showTruckC = false; // removing B also removes C
   renderRightPanel();
+  updateViewModeToggle(); // re-applies viewMode gates including Truck C visibility
 }
 
 function toggleTruckC() {
@@ -4703,11 +4695,11 @@ function updateViewModeToggle() {
   mgr.style.color       = isManager  ? '#fff'             : 'rgba(0,0,0,0.45)';
   sp.style.background  = !isManager ? 'rgba(0,0,0,0.75)' : 'transparent';
   sp.style.color        = !isManager ? '#fff'             : 'rgba(0,0,0,0.45)';
-  // Truck C — manager only
+  // Truck C — manager only. Only show if manager AND Truck B is already added.
   const truckCBtn = document.getElementById('truck-c-btn');
   const truckBBtn = document.getElementById('truck-b-btn');
-  if (truckCBtn) truckCBtn.style.display = (!isManager || !state.showTruckB) ? 'none' : (state.showTruckC ? 'inline-flex' : 'inline-flex');
-  if (!isManager && truckBBtn) truckBBtn.style.display = state.showTruckB ? 'none' : 'inline-flex';
+  if (truckCBtn) truckCBtn.style.display = (isManager && state.showTruckB) ? 'inline-flex' : 'none';
+  if (truckBBtn) truckBBtn.style.display = state.showTruckB ? 'none' : 'inline-flex';
 }
 
 
