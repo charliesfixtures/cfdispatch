@@ -1837,6 +1837,28 @@ body {
   </div>
 </div>
 
+<!-- S27: LOGIN OVERLAY (shown if no token in localStorage) -->
+<div class="settings-overlay" id="login-overlay" style="display: none;">
+  <div class="settings-panel" style="max-width: 400px;">
+    <div class="settings-title">🔐 Connect Your Trello Account</div>
+    <div class="settings-sub" style="margin-bottom: 20px;">CF Dispatch requires your Trello personal token to verify your role and permissions.</div>
+
+    <div class="settings-section">
+      <div class="form-group">
+        <label class="form-label">Trello Personal Token</label>
+        <input type="password" class="form-input" id="login-token" placeholder="Paste your token here..." style="font-family: 'DM Mono', monospace; font-size: 11px;" />
+        <div style="font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 8px; line-height: 1.5;">
+          <div>📌 Don't have a token? Visit <strong>trello.com/app-key</strong> and create one from the Token section.</div>
+          <div style="margin-top: 6px;">🔒 Your token is stored locally in your browser. Never shared.</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="connect-btn" onclick="performLogin()">Continue</button>
+    <div id="login-error" style="font-size: 12px; color: var(--danger); margin-top: 12px; display: none;"></div>
+  </div>
+</div>
+
 <!-- SETTINGS OVERLAY -->
 <div class="settings-overlay" id="settings-overlay">
   <div class="settings-panel">
@@ -1844,10 +1866,10 @@ body {
     <div class="settings-sub">CF Dispatch Tool — Configuration</div>
 
     <div class="settings-section">
-      <div class="settings-section-title">Trello Connection</div>
-      <div class="form-group">
-        <label class="form-label">API Token (your personal Trello token)</label>
-        <input type="password" class="form-input" id="settings-token" placeholder="Paste your Trello token..." />
+      <div class="settings-section-title">Session</div>
+      <div id="session-info" style="font-size:12px;color:rgba(0,0,0,0.55);line-height:1.7">
+        <div id="session-user">👤 Not logged in</div>
+        <div id="session-role"></div>
       </div>
       <div id="connection-status-wrap" style="display:none">
         <div class="connection-status" id="connection-status">
@@ -1855,7 +1877,7 @@ body {
           <span id="conn-status-text">Connected</span>
         </div>
       </div>
-      <button class="connect-btn" onclick="saveSettings()">Save & Connect</button>
+      <button class="connect-btn" onclick="performLogout()" style="background:rgba(180,60,60,0.08);color:rgba(180,60,60,0.8);border:1px solid rgba(180,60,60,0.15);">Log Out</button>
     </div>
 
     <div class="settings-section">
@@ -1893,8 +1915,8 @@ body {
 // ════════════════════════════════════════════════════════
 // CONSTANTS & CONFIG
 // ════════════════════════════════════════════════════════
-const API_KEY = 'TRELLO_API_KEY_PLACEHOLDER';
-let TOKEN = localStorage.getItem('cf_dispatch_token') || 'TRELLO_TOKEN_PLACEHOLDER';
+const WORKER_URL = 'https://cf-dispatch-auth.willdsy.workers.dev';
+let SESSION_TOKEN = localStorage.getItem('cf_dispatch_session') || null;
 
 const BOARD_ID = '699600604764a1cd3d99dba1'; // TEST BOARD — swap back to 'GpVORoMM' for production launch
 const HIDDEN_BOARD_ID = '6965633f4fe5254c47e38527';
@@ -1985,6 +2007,14 @@ function isRouteLocked(dayKey, truck) {
   return !!state.lockedTrucks?.[truckKey];
 }
 
+// S27: Parse comma-separated multi-value field (e.g., "PK Jeff, PK SFC" → ["PK Jeff", "PK SFC"])
+// First value = primary (used for uncommit routing, fallback assignments, etc.)
+// All values tracked for future features (e.g., manager chooses target on uncommit)
+function parseMultiValue(fieldValue) {
+  if (!fieldValue) return [];
+  return fieldValue.split(',').map(val => val.trim()).filter(val => val.length > 0);
+}
+
 // ════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════
@@ -2013,19 +2043,40 @@ let state = {
 // TRELLO API
 // ════════════════════════════════════════════════════════
 async function trello(path, method = 'GET', body = null) {
-  const sep = path.includes('?') ? '&' : '?';
-  const url = `https://api.trello.com/1${path}${sep}key=${API_KEY}&token=${TOKEN}`;
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (!SESSION_TOKEN) throw new Error('AUTH');
+  const url = `${WORKER_URL}/api/trello${path}`;
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SESSION_TOKEN}`
+    }
+  };
   if (body) opts.body = JSON.stringify(body);
   try {
     const r = await fetch(url, opts);
-    if (r.status === 401) throw new Error('AUTH');
+    if (r.status === 401 || r.status === 403) {
+      const errData = await r.json().catch(() => ({}));
+      if (errData.error === 'Session expired' || errData.error === 'Session not found') {
+        // Session dead — force re-login
+        SESSION_TOKEN = null;
+        localStorage.removeItem('cf_dispatch_session');
+        localStorage.removeItem('cf_dispatch_user');
+        localStorage.removeItem('cf_dispatch_viewMode');
+        document.getElementById('login-overlay').style.display = 'flex';
+        throw new Error('SESSION_EXPIRED');
+      }
+      if (errData.error === 'Access denied') {
+        setSyncStatus('error', 'Access revoked — contact admin');
+        throw new Error('BLACKLISTED');
+      }
+      throw new Error('AUTH');
+    }
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
   } catch(e) {
     if (e.message === 'AUTH') {
-      setSyncStatus('error', 'Auth failed — check token in Settings');
-      openSettings();
+      setSyncStatus('error', 'Auth failed — re-login required');
     }
     throw e;
   }
@@ -4439,38 +4490,57 @@ async function loadData() {
 }
 
 async function loadDrivers() {
-  const cards = await trello(`/lists/${DRIVERS_LIST_ID}/cards?attachments=true&checklists=all&fields=id,name,due,start,desc&limit=50`);
-  state.drivers = cards.map((c) => {
-    // Parse driver info from "Driver Info" checklist
-    const infoChecklist = c.checklists?.find(cl => cl.name.toLowerCase().includes('driver info'));
-    const checklistData = {};
-    if (infoChecklist) {
-      infoChecklist.checkItems?.forEach(item => {
-        const text = item.name.trim();
-        // Parse "Key: Value" or "Key Value" patterns
-        const colonMatch = text.match(/^([^:]+):\s*(.+)$/);
-        if (colonMatch) {
-          checklistData[colonMatch[1].trim().toLowerCase()] = colonMatch[2].trim();
-        }
-      });
-    }
+  // S27: Load staff cards from DISPATCH TRELLO list, filter by Job: "Driver"
+  const DISPATCH_TRELLO_LIST = '699df279600f35c809d451af';
+  const cards = await trello(`/lists/${DISPATCH_TRELLO_LIST}/cards?attachments=true&checklists=all&fields=id,name,due,start,desc&limit=50`);
+  
+  state.drivers = cards
+    .filter(c => {
+      // Filter: Job field must contain "Driver" as a separate role (comma-split)
+      const staffInfoChecklist = c.checklists?.find(cl => cl.name.toLowerCase().includes('staff info'));
+      if (!staffInfoChecklist) return false;
+      
+      const jobItem = staffInfoChecklist.checkItems?.find(item => 
+        item.name.trim().toLowerCase().startsWith('job:')
+      );
+      if (!jobItem) return false;
+      
+      const jobValue = jobItem.name.trim().replace(/^job:\s*/i, '');
+      const roles = jobValue.split(',').map(r => r.trim());
+      
+      // Match "Driver" exactly (not substring) — separate comma-split role
+      return roles.includes('Driver');
+    })
+    .map((c) => {
+      // Parse STAFF INFO checklist for all staff fields
+      const staffInfoChecklist = c.checklists?.find(cl => cl.name.toLowerCase().includes('staff info'));
+      const checklistData = {};
+      if (staffInfoChecklist) {
+        staffInfoChecklist.checkItems?.forEach(item => {
+          const text = item.name.trim();
+          const colonMatch = text.match(/^([^:]+):\s*(.+)$/);
+          if (colonMatch) {
+            checklistData[colonMatch[1].trim().toLowerCase()] = colonMatch[2].trim();
+          }
+        });
+      }
 
-    // Phone: try checklist first, then description fallback
-    const phone = checklistData.phone || checklistData['phone number'] || checklistData.mobile || checklistData.cell || (() => {
-      const phoneMatch = c.desc?.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4})/);
-      return phoneMatch ? phoneMatch[1].trim() : null;
-    })();
+      // Phone: from checklist, then description fallback
+      const phone = checklistData.mobile || checklistData.phone || checklistData['phone number'] || checklistData.cell || (() => {
+        const phoneMatch = c.desc?.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4})/);
+        return phoneMatch ? phoneMatch[1].trim() : null;
+      })();
 
-    return {
-      id: c.id,
-      name: c.name,
-      phone: phone,
-      driverInfo: checklistData,
-      photo: c.attachments?.find(a => a.previews?.length)?.previews?.slice(-1)[0]?.url || null,
-      unavailableFrom: c.start || null,
-      unavailableUntil: c.due || null,
-    };
-  });
+      return {
+        id: c.id,
+        name: c.name,
+        phone: phone,
+        driverInfo: checklistData,
+        photo: c.attachments?.find(a => a.previews?.length)?.previews?.slice(-1)[0]?.url || null,
+        unavailableFrom: c.start || null,
+        unavailableUntil: c.due || null,
+      };
+    });
 
   // Restore saved driver assignments from localStorage
   try {
@@ -4690,15 +4760,49 @@ function updateViewModeToggle() {
   const mgr = document.getElementById('vmt-manager');
   const sp  = document.getElementById('vmt-salesperson');
   if (!mgr || !sp) return;
+  
+  // S27: Toggle visibility based on role
+  // Admin: toggle visible (for testing/troubleshooting)
+  // Manager: role badge only
+  // Salesperson: role badge only
+  const isAdmin = state.viewMode === 'admin';
   const isManager = state.viewMode === 'manager';
-  mgr.style.background = isManager  ? 'rgba(0,0,0,0.75)' : 'transparent';
-  mgr.style.color       = isManager  ? '#fff'             : 'rgba(0,0,0,0.45)';
-  sp.style.background  = !isManager ? 'rgba(0,0,0,0.75)' : 'transparent';
-  sp.style.color        = !isManager ? '#fff'             : 'rgba(0,0,0,0.45)';
-  // Truck C — manager only. Only show if manager AND Truck B is already added.
+  const isSalesperson = state.viewMode === 'salesperson';
+  
+  // Hide both toggle buttons first
+  mgr.style.display = 'none';
+  sp.style.display = 'none';
+  
+  if (isAdmin) {
+    // Admin: show toggle buttons for testing
+    mgr.style.display = 'inline-block';
+    sp.style.display = 'inline-block';
+    mgr.style.background = 'rgba(0,0,0,0.75)';
+    mgr.style.color = '#fff';
+    sp.style.background = 'transparent';
+    sp.style.color = 'rgba(0,0,0,0.45)';
+  } else if (isManager) {
+    // Manager: show badge, no toggle
+    mgr.textContent = '👔 Manager';
+    mgr.style.display = 'inline-block';
+    mgr.style.background = 'transparent';
+    mgr.style.color = 'rgba(0,0,0,0.45)';
+    mgr.onclick = null; // disable click
+    mgr.style.cursor = 'default';
+  } else if (isSalesperson) {
+    // Salesperson: show badge, no toggle
+    sp.textContent = '🙋 Salesperson';
+    sp.style.display = 'inline-block';
+    sp.style.background = 'transparent';
+    sp.style.color = 'rgba(0,0,0,0.45)';
+    sp.onclick = null; // disable click
+    sp.style.cursor = 'default';
+  }
+  
+  // Truck C — manager and admin only. Only show if manager/admin AND Truck B is already added.
   const truckCBtn = document.getElementById('truck-c-btn');
   const truckBBtn = document.getElementById('truck-b-btn');
-  if (truckCBtn) truckCBtn.style.display = (isManager && state.showTruckB) ? 'inline-flex' : 'none';
+  if (truckCBtn) truckCBtn.style.display = ((isManager || isAdmin) && state.showTruckB) ? 'inline-flex' : 'none';
   if (truckBBtn) truckBBtn.style.display = state.showTruckB ? 'none' : 'inline-flex';
 }
 
@@ -4753,31 +4857,101 @@ function closeModal(id) {
 }
 
 function openSettings() {
-  document.getElementById('settings-token').value = TOKEN !== 'TRELLO_TOKEN_PLACEHOLDER' ? TOKEN : '';
+  // Show session info
+  const savedUser = localStorage.getItem('cf_dispatch_user');
+  const savedViewMode = localStorage.getItem('cf_dispatch_viewMode');
+  if (savedUser) {
+    try {
+      const user = JSON.parse(savedUser);
+      document.getElementById('session-user').textContent = `👤 ${user.fullName || 'Unknown'}`;
+      const roleLabel = savedViewMode === 'admin' ? '⚙️ Admin' : savedViewMode === 'manager' ? '👔 Manager' : '🙋 Salesperson';
+      document.getElementById('session-role').textContent = roleLabel;
+    } catch {}
+  }
+  document.getElementById('connection-status-wrap').style.display = SESSION_TOKEN ? 'block' : 'none';
+  document.getElementById('conn-status-icon').textContent = SESSION_TOKEN ? '✅' : '❌';
+  document.getElementById('conn-status-text').textContent = SESSION_TOKEN ? 'Connected via secure session' : 'Not connected';
   document.getElementById('settings-overlay').classList.add('open');
 }
 
-async function saveSettings() {
-  const newToken = document.getElementById('settings-token').value.trim();
-  if (!newToken) { showToast('Please enter a token', 'error'); return; }
+// S29: LOGIN SYSTEM — Worker-based auth (token never stored client-side)
+async function performLogin() {
+  const tokenInput = document.getElementById('login-token');
+  const errorDiv = document.getElementById('login-error');
+  const token = tokenInput.value.trim();
 
-  TOKEN = newToken;
-  localStorage.setItem('cf_dispatch_token', TOKEN);
-
-  // Test connection
-  try {
-    await trello(`/boards/${BOARD_ID}?fields=name`);
-    document.getElementById('connection-status-wrap').style.display = 'block';
-    document.getElementById('conn-status-icon').textContent = '✅';
-    document.getElementById('conn-status-text').textContent = 'Connected to CF ASANA';
-    showToast('Connected successfully', 'success');
-    closeModal('settings-overlay');
-    loadData();
-  } catch {
-    document.getElementById('connection-status-wrap').style.display = 'block';
-    document.getElementById('conn-status-icon').textContent = '❌';
-    document.getElementById('conn-status-text').textContent = 'Connection failed — check token';
+  if (!token) {
+    errorDiv.textContent = '⚠️ Please paste your token';
+    errorDiv.style.display = 'block';
+    return;
   }
+
+  try {
+    errorDiv.style.display = 'none';
+
+    // Call Worker — Worker validates token, finds staff card, encrypts, creates session
+    const resp = await fetch(`${WORKER_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trelloToken: token })
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      if (resp.status === 401) throw new Error('INVALID_TOKEN');
+      if (data.error === 'Not on staff') throw new Error('STAFF_NOT_FOUND');
+      if (data.error === 'Access denied') throw new Error('BLACKLISTED');
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+
+    // Worker returns: { sessionToken, role, fullName }
+    SESSION_TOKEN = data.sessionToken;
+    const role = data.role;
+    const fullName = data.fullName;
+
+    // Persist session (NOT the raw Trello token — only the session token)
+    localStorage.setItem('cf_dispatch_session', SESSION_TOKEN);
+    localStorage.setItem('cf_dispatch_user', JSON.stringify({
+      fullName: fullName,
+      role: role
+    }));
+    localStorage.setItem('cf_dispatch_viewMode', role);
+
+    // Close login overlay and load app
+    document.getElementById('login-overlay').style.display = 'none';
+    state.viewMode = role;
+    updateViewModeToggle();
+    renderDayPills();
+    renderQueue();
+    renderRightPanel();
+    loadData();
+
+    showToast(`👤 Logged in as ${fullName} (${role === 'admin' ? '⚙️ Admin' : role === 'manager' ? '👔 Manager' : '🙋 Salesperson'})`, 'success');
+  } catch (e) {
+    if (e.message === 'INVALID_TOKEN') {
+      errorDiv.textContent = '❌ Invalid token. Check your token and try again.';
+    } else if (e.message === 'STAFF_NOT_FOUND') {
+      errorDiv.textContent = '❌ Your Trello account is not on file. Contact manager.';
+    } else if (e.message === 'BLACKLISTED') {
+      errorDiv.textContent = '❌ Your access has been revoked. Contact admin.';
+    } else {
+      errorDiv.textContent = `❌ Login failed: ${e.message}`;
+    }
+    errorDiv.style.display = 'block';
+  }
+}
+
+// S29: findStaffCardByTrelloId and parseJobField removed — Worker handles auth server-side
+
+function performLogout() {
+  SESSION_TOKEN = null;
+  localStorage.removeItem('cf_dispatch_session');
+  localStorage.removeItem('cf_dispatch_user');
+  localStorage.removeItem('cf_dispatch_viewMode');
+  closeModal('settings-overlay');
+  document.getElementById('login-overlay').style.display = 'flex';
+  showToast('Logged out', 'info');
 }
 
 function showConfirm(icon, title, msg, onConfirm) {
@@ -4803,23 +4977,30 @@ setInterval(loadData, 60000);
 // INIT
 // ════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  // S29: Check for existing session — if no session, show login overlay
+  const existingSession = localStorage.getItem('cf_dispatch_session');
+  if (!existingSession) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    return; // Don't load app until login succeeds
+  }
+
+  // Restore session from localStorage
+  SESSION_TOKEN = existingSession;
+  const savedViewMode = localStorage.getItem('cf_dispatch_viewMode');
+  if (savedViewMode) {
+    state.viewMode = savedViewMode;
+  }
+
+  // Initialize app (session validated implicitly on first Worker proxy call)
   initMap();
-
-  // Restore lock state from localStorage
   loadLockState();
-
-  // Restore schedule (staged + committed stops) from localStorage
   loadSchedule();
 
-  // Set default right panel day to next Monday
   const week1 = getWeekDates(0);
   state.activeRightDay = week1[0].key;
 
-  // Render dynamic day pills
   renderDayPills();
   updateViewModeToggle();
-
-  // Load data
   loadData();
 });
 </script>
