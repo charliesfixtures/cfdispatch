@@ -2031,7 +2031,8 @@ let state = {
   popoverTarget: null,  // { type: 'queue'|'stop', id, dayKey?, truck?, index?, el? }
   lockedTrucks: {},      // { 'MON-W1-A': true }
   showTruckB: false,     // hidden by default — Truck A only at start
-  viewMode: 'manager',   // 'manager' | 'salesperson' — toggle under day pills, removed at final product
+  viewMode: 'manager',   // 'manager' | 'salesperson' — controls permissions and UI visibility
+  loginRole: null,        // S29: actual role from login ('admin'|'manager'|'salesperson') — controls toggle visibility
   showTruckC: false,     // hidden by default
   mapMarkers: {},
   mapRouteLines: {},
@@ -2060,9 +2061,11 @@ async function trello(path, method = 'GET', body = null) {
       if (errData.error === 'Session expired' || errData.error === 'Session not found') {
         // Session dead — force re-login
         SESSION_TOKEN = null;
+        state.loginRole = null;
         localStorage.removeItem('cf_dispatch_session');
         localStorage.removeItem('cf_dispatch_user');
         localStorage.removeItem('cf_dispatch_viewMode');
+        localStorage.removeItem('cf_dispatch_loginRole');
         document.getElementById('login-overlay').style.display = 'flex';
         throw new Error('SESSION_EXPIRED');
       }
@@ -4761,48 +4764,61 @@ function updateViewModeToggle() {
   const sp  = document.getElementById('vmt-salesperson');
   if (!mgr || !sp) return;
   
-  // S27: Toggle visibility based on role
+  // S29: Toggle visibility based on LOGIN ROLE (not current viewMode)
   // Admin: toggle visible (for testing/troubleshooting)
   // Manager: role badge only
   // Salesperson: role badge only
-  const isAdmin = state.viewMode === 'admin';
-  const isManager = state.viewMode === 'manager';
-  const isSalesperson = state.viewMode === 'salesperson';
+  const isAdmin = state.loginRole === 'admin';
+  const currentIsManager = state.viewMode === 'manager';
+  const currentIsSalesperson = state.viewMode === 'salesperson';
   
   // Hide both toggle buttons first
   mgr.style.display = 'none';
   sp.style.display = 'none';
   
   if (isAdmin) {
-    // Admin: show toggle buttons for testing
+    // Admin: show toggle buttons for testing — highlight based on current viewMode
+    mgr.textContent = '👔 Manager';
+    sp.textContent = '🙋 Salesperson';
     mgr.style.display = 'inline-block';
     sp.style.display = 'inline-block';
-    mgr.style.background = 'rgba(0,0,0,0.75)';
-    mgr.style.color = '#fff';
-    sp.style.background = 'transparent';
-    sp.style.color = 'rgba(0,0,0,0.45)';
-  } else if (isManager) {
+    mgr.style.cursor = 'pointer';
+    sp.style.cursor = 'pointer';
+    mgr.onclick = () => setViewMode('manager');
+    sp.onclick = () => setViewMode('salesperson');
+    if (currentIsManager) {
+      mgr.style.background = 'rgba(0,0,0,0.75)';
+      mgr.style.color = '#fff';
+      sp.style.background = 'transparent';
+      sp.style.color = 'rgba(0,0,0,0.45)';
+    } else {
+      sp.style.background = 'rgba(0,0,0,0.75)';
+      sp.style.color = '#fff';
+      mgr.style.background = 'transparent';
+      mgr.style.color = 'rgba(0,0,0,0.45)';
+    }
+  } else if (state.loginRole === 'manager') {
     // Manager: show badge, no toggle
     mgr.textContent = '👔 Manager';
     mgr.style.display = 'inline-block';
     mgr.style.background = 'transparent';
     mgr.style.color = 'rgba(0,0,0,0.45)';
-    mgr.onclick = null; // disable click
+    mgr.onclick = null;
     mgr.style.cursor = 'default';
-  } else if (isSalesperson) {
+  } else {
     // Salesperson: show badge, no toggle
     sp.textContent = '🙋 Salesperson';
     sp.style.display = 'inline-block';
     sp.style.background = 'transparent';
     sp.style.color = 'rgba(0,0,0,0.45)';
-    sp.onclick = null; // disable click
+    sp.onclick = null;
     sp.style.cursor = 'default';
   }
   
   // Truck C — manager and admin only. Only show if manager/admin AND Truck B is already added.
   const truckCBtn = document.getElementById('truck-c-btn');
   const truckBBtn = document.getElementById('truck-b-btn');
-  if (truckCBtn) truckCBtn.style.display = ((isManager || isAdmin) && state.showTruckB) ? 'inline-flex' : 'none';
+  if (truckCBtn) truckCBtn.style.display = (currentIsManager && state.showTruckB) ? 'inline-flex' : 'none';
   if (truckBBtn) truckBBtn.style.display = state.showTruckB ? 'none' : 'inline-flex';
 }
 
@@ -4864,7 +4880,7 @@ function openSettings() {
     try {
       const user = JSON.parse(savedUser);
       document.getElementById('session-user').textContent = `👤 ${user.fullName || 'Unknown'}`;
-      const roleLabel = savedViewMode === 'admin' ? '⚙️ Admin' : savedViewMode === 'manager' ? '👔 Manager' : '🙋 Salesperson';
+      const roleLabel = state.loginRole === 'admin' ? '⚙️ Admin' : state.loginRole === 'manager' ? '👔 Manager' : '🙋 Salesperson';
       document.getElementById('session-role').textContent = roleLabel;
     } catch {}
   }
@@ -4910,17 +4926,23 @@ async function performLogin() {
     const role = data.role;
     const fullName = data.fullName;
 
+    // S29: loginRole = actual role, viewMode = effective permissions
+    // Admin gets manager permissions by default + toggle for testing
+    state.loginRole = role;
+    const effectiveViewMode = (role === 'admin') ? 'manager' : role;
+
     // Persist session (NOT the raw Trello token — only the session token)
     localStorage.setItem('cf_dispatch_session', SESSION_TOKEN);
     localStorage.setItem('cf_dispatch_user', JSON.stringify({
       fullName: fullName,
       role: role
     }));
-    localStorage.setItem('cf_dispatch_viewMode', role);
+    localStorage.setItem('cf_dispatch_viewMode', effectiveViewMode);
+    localStorage.setItem('cf_dispatch_loginRole', role);
 
     // Close login overlay and initialize app (first login — DOMContentLoaded skipped init)
     document.getElementById('login-overlay').style.display = 'none';
-    state.viewMode = role;
+    state.viewMode = effectiveViewMode;
 
     initMap();
     loadLockState();
@@ -4954,9 +4976,11 @@ async function performLogin() {
 
 function performLogout() {
   SESSION_TOKEN = null;
+  state.loginRole = null;
   localStorage.removeItem('cf_dispatch_session');
   localStorage.removeItem('cf_dispatch_user');
   localStorage.removeItem('cf_dispatch_viewMode');
+  localStorage.removeItem('cf_dispatch_loginRole');
   closeModal('settings-overlay');
   document.getElementById('login-overlay').style.display = 'flex';
   showToast('Logged out', 'info');
@@ -4995,8 +5019,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Restore session from localStorage
   SESSION_TOKEN = existingSession;
   const savedViewMode = localStorage.getItem('cf_dispatch_viewMode');
+  const savedLoginRole = localStorage.getItem('cf_dispatch_loginRole');
   if (savedViewMode) {
     state.viewMode = savedViewMode;
+  }
+  if (savedLoginRole) {
+    state.loginRole = savedLoginRole;
   }
 
   // Initialize app (session validated implicitly on first Worker proxy call)
