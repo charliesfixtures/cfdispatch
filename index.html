@@ -1929,6 +1929,15 @@ const CUSTOM_FIELDS = {
   OT:        '69839631a61d2fa52d6c0699',
 };
 
+// S29: Dynamic custom field ID lookup — checks state.customFields first, falls back to hardcoded
+function getFieldId(name) {
+  const dynamic = state.customFields?.find(f => f.name === name);
+  if (dynamic) return dynamic.id;
+  // Fallback to hardcoded (main board IDs)
+  const map = { 'RS': CUSTOM_FIELDS.RS, 'INV TOTAL': CUSTOM_FIELDS.INV_TOTAL, 'OT': CUSTOM_FIELDS.OT, 'AQREF:': CUSTOM_FIELDS.AQREF };
+  return map[name] || null;
+}
+
 const FRUITLAND = { lat: 33.9989, lng: -118.2054, name: 'CF Fruitland' };
 const HQ = { lat: 34.043654, lng: -118.307807, name: "CF Venice" };
 
@@ -3690,18 +3699,16 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
   const dayInfo = allDays.find(d => d.key === dayKey);
   if (!dayInfo) { showToast('Could not determine date', 'error'); return; }
 
-  // Due date = scheduled day at 5:00 PM Pacific
+  // Due date = scheduled day at 5:00 PM Pacific (browser is in Pacific timezone)
   const dueDate = new Date(dayInfo.date);
-  const isDST = dueDate.getMonth() >= 2 && dueDate.getMonth() <= 10; // rough DST
   dueDate.setHours(17, 0, 0, 0);
-  const offset = isDST ? 7 : 8; // PDT = UTC-7, PST = UTC-8
-  const utcDue = new Date(dueDate.getTime() + offset * 3600000);
+  // JS Date already stores this as UTC internally — toISOString() converts correctly
 
   try {
     showToast('Committing to Trello…', 'info');
 
     // 1. Set due date
-    await trello(`/cards/${stop.cardId}`, 'PUT', { due: utcDue.toISOString() });
+    await trello(`/cards/${stop.cardId}`, 'PUT', { due: dueDate.toISOString() });
 
     // 2. Set OT custom field to true
     const otField = state.customFields?.find(f => f.name === 'OT');
@@ -4012,7 +4019,10 @@ function removeStop(dayKey, truck, idx) {
       } catch(e) { console.warn('Uncommit: could not clear due date', e); }
 
       try {
-        await trello(`/cards/${cardId}/customField/${CUSTOM_FIELDS.OT}/item`, 'PUT', { value: { checked: 'false' } });
+        const otField = state.customFields?.find(f => f.name === 'OT');
+        if (otField) {
+          await trello(`/cards/${cardId}/customField/${otField.id}/item`, 'PUT', { value: { checked: 'false' } });
+        }
       } catch(e) { console.warn('Uncommit: could not clear OT field', e); }
 
       try {
@@ -4426,6 +4436,11 @@ async function loadData() {
   setSyncStatus('syncing', 'Syncing...');
 
   try {
+    // Load custom fields for this board (dynamic — works on any board)
+    try {
+      state.customFields = await trello(`/boards/${BOARD_ID}/customFields`);
+    } catch(e) { console.warn('Could not load custom fields', e); state.customFields = []; }
+
     // Load drivers from hidden board
     await loadDrivers();
 
@@ -4580,8 +4595,8 @@ function renderDriverBar() {
 async function processCard(card) {
   // Extract custom field values
   const fields = card.customFieldItems || [];
-  const rsField = fields.find(f => f.idCustomField === CUSTOM_FIELDS.RS);
-  const invField = fields.find(f => f.idCustomField === CUSTOM_FIELDS.INV_TOTAL);
+  const rsField = fields.find(f => f.idCustomField === getFieldId('RS'));
+  const invField = fields.find(f => f.idCustomField === getFieldId('INV TOTAL'));
 
   // Get location directly from card fields (Trello stores Google Places coords here)
   let address = card.address || null;
@@ -4699,7 +4714,7 @@ async function loadScheduledCards() {
     try {
       const cards = await trello(`/lists/${list.id}/cards?customFieldItems=true&fields=id,name,shortLink,due`);
       for (const card of cards) {
-        const otField = card.customFieldItems?.find(f => f.idCustomField === CUSTOM_FIELDS.OT);
+        const otField = card.customFieldItems?.find(f => f.idCustomField === getFieldId('OT'));
         if (otField?.value?.checked === 'true' && card.due) {
           // Add to schedule display
           const dueDate = new Date(card.due);
