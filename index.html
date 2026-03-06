@@ -4015,7 +4015,7 @@ function removeStop(dayKey, truck, idx) {
       } catch(e) { console.warn('Uncommit: could not move to RFS', e); }
 
       try {
-        await trello(`/cards/${cardId}`, 'PUT', { due: null });
+        await trello(`/cards/${cardId}`, 'PUT', { due: '' });
       } catch(e) { console.warn('Uncommit: could not clear due date', e); }
 
       try {
