@@ -1849,7 +1849,7 @@ body {
         <input type="password" class="form-input" id="login-token" placeholder="Paste your token here..." style="font-family: 'DM Mono', monospace; font-size: 11px;" />
         <div style="font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 8px; line-height: 1.5;">
           <div>📌 Don't have a token? Visit <strong>trello.com/app-key</strong> and create one from the Token section.</div>
-          <div style="margin-top: 6px;">🔒 Your token is stored locally in your browser. Never shared.</div>
+          <div style="margin-top: 6px;">🔒 Your token is verified securely and never stored in the browser.</div>
         </div>
       </div>
     </div>
@@ -4918,9 +4918,17 @@ async function performLogin() {
     }));
     localStorage.setItem('cf_dispatch_viewMode', role);
 
-    // Close login overlay and load app
+    // Close login overlay and initialize app (first login — DOMContentLoaded skipped init)
     document.getElementById('login-overlay').style.display = 'none';
     state.viewMode = role;
+
+    initMap();
+    loadLockState();
+    loadSchedule();
+
+    const week1 = getWeekDates(0);
+    state.activeRightDay = week1[0].key;
+
     updateViewModeToggle();
     renderDayPills();
     renderQueue();
