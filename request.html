@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CF Delivery Request</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2436;
+    --border: #2a3045;
+    --accent: #f0c93a;
+    --accent2: #4f8eff;
+    --text: #e8eaf0;
+    --text2: #8890a8;
+    --success: #7ed6a0;
+    --danger: #e07a5f;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 40px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .header-sub {
+    font-size: 11px;
+    color: var(--text2);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+  }
+
+  .card-ref {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-ref-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .card-ref-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .section {
+    margin-bottom: 20px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .field {
+    margin-bottom: 12px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .field input[type="text"],
+  .field input[type="tel"],
+  .field textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    outline: none;
+    resize: none;
+  }
+
+  .field input:focus,
+  .field textarea:focus {
+    border-color: var(--accent2);
+  }
+
+  .field input::placeholder,
+  .field textarea::placeholder {
+    color: var(--text2);
+    opacity: 0.6;
+  }
+
+  /* Checkbox grid */
+  .check-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .check-item {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .check-item:hover {
+    border-color: var(--accent2);
+    background: var(--surface2);
+  }
+
+  .check-item.checked {
+    border-color: var(--accent);
+    background: rgba(240, 201, 58, 0.08);
+  }
+
+  .check-item input[type="checkbox"] {
+    display: none;
+  }
+
+  .check-box {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    font-size: 11px;
+  }
+
+  .check-item.checked .check-box {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  .check-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .check-label .icon {
+    font-size: 14px;
+    margin-right: 4px;
+  }
+
+  /* First stop toggle — full width special */
+  .first-stop-item {
+    grid-column: 1 / -1;
+    border-color: rgba(79, 142, 255, 0.3);
+  }
+
+  .first-stop-item.checked {
+    border-color: var(--accent2);
+    background: rgba(79, 142, 255, 0.08);
+  }
+
+  .first-stop-item.checked .check-box {
+    background: var(--accent2);
+    border-color: var(--accent2);
+  }
+
+  .first-stop-badge {
+    margin-left: auto;
+    font-size: 9px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent2);
+    background: rgba(79, 142, 255, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Notes */
+  .field textarea {
+    height: 80px;
+  }
+
+  /* Submit */
+  .submit-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .submit-btn:hover { background: #f5d660; transform: translateY(-1px); }
+  .submit-btn:active { transform: translateY(0); }
+  .submit-btn:disabled {
+    background: var(--border);
+    color: var(--text2);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* States */
+  .loading-state,
+  .success-state,
+  .error-state {
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .state-icon { font-size: 40px; margin-bottom: 16px; }
+
+  .state-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .state-sub {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .required-star {
+    color: var(--danger);
+    margin-left: 2px;
+  }
+
+  .field-error {
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 4px;
+    display: none;
+  }
+
+  .field.has-error input,
+  .field.has-error textarea {
+    border-color: var(--danger);
+  }
+
+  .field.has-error .field-error {
+    display: block;
+  }
+
+  .already-submitted {
+    background: rgba(126, 214, 160, 0.08);
+    border: 1px solid rgba(126, 214, 160, 0.3);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 20px;
+    font-size: 12px;
+    color: var(--success);
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="loading-screen" class="loading-state">
+    <div class="state-icon">🚛</div>
+    <div class="state-title">Loading...</div>
+    <div class="progress-bar"><div class="progress-fill" id="load-progress"></div></div>
+  </div>
+
+  <div id="main-form" style="display:none;">
+    <div class="header">
+      <div class="header-icon">🚛</div>
+      <div>
+        <div class="header-title">Delivery Request</div>
+        <div class="header-sub">Charlie's Fixtures · Dispatch</div>
+      </div>
+    </div>
+
+    <div class="card-ref">
+      <span class="card-ref-label">Card</span>
+      <span class="card-ref-name" id="card-name">Loading...</span>
+    </div>
+
+    <div class="already-submitted" id="already-submitted">
+      ✅ Delivery instructions already submitted for this card.
+    </div>
+
+    <!-- Customer Info -->
+    <div class="section">
+      <div class="section-label">Customer Info</div>
+
+      <div class="field" id="field-customer-name">
+        <label>Customer Name <span class="required-star">*</span></label>
+        <input type="text" id="customer-name" placeholder="Full name of receiving contact" />
+        <div class="field-error">Customer name is required</div>
+      </div>
+
+      <div class="field" id="field-customer-phone">
+        <label>Customer Phone <span class="required-star">*</span></label>
+        <input type="tel" id="customer-phone" placeholder="(555) 000-0000" />
+        <div class="field-error">Valid phone number is required</div>
+      </div>
+    </div>
+
+    <!-- Delivery Instructions -->
+    <div class="section">
+      <div class="section-label">Delivery Instructions</div>
+      <div class="check-grid">
+
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" id="chk-stairs" />
+          <div class="check-box">✓</div>
+          <div class="check-label"><span class="icon">🪜</span>Stairs / Elevator</div>
+        </label>
+
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" id="chk-removal" />
+          <div class="check-box">✓</div>
+          <div class="check-label"><span class="icon">🔧</span>Equipment Removal</div>
+        </label>
+
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" id="chk-whiteglove" />
+          <div class="check-box">✓</div>
+          <div class="check-label"><span class="icon">🤍</span>White Glove</div>
+        </label>
+
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" id="chk-dropoff" />
+          <div class="check-box">✓</div>
+          <div class="check-label"><span class="icon">📦</span>Drop-off Only</div>
+        </label>
+
+        <label class="check-item first-stop-item" onclick="toggleCheck(this)">
+          <input type="checkbox" id="chk-firststop" />
+          <div class="check-box">✓</div>
+          <div class="check-label"><span class="icon">🥇</span>First Stop Requested</div>
+          <div class="first-stop-badge">Priority</div>
+        </label>
+
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="section">
+      <div class="section-label">Special Notes</div>
+      <div class="field">
+        <label>Additional Instructions</label>
+        <textarea id="delivery-notes" placeholder="e.g. Government facility — bring ID. Limited receiving hours 8am–12pm. Fragile items on top."></textarea>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()">
+      <span>📋</span> Submit Delivery Request
+    </button>
+  </div>
+
+  <div id="success-screen" style="display:none;" class="success-state">
+    <div class="state-icon">✅</div>
+    <div class="state-title">Request Submitted</div>
+    <div class="state-sub">Delivery instructions have been saved to the card.<br>The dispatch team will review and schedule your delivery.</div>
+  </div>
+
+  <div id="error-screen" style="display:none;" class="error-state">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title" id="error-title">Something went wrong</div>
+    <div class="state-sub" id="error-msg">Please try again or contact the dispatch team.</div>
+    <button class="submit-btn" style="margin-top:20px;max-width:200px;margin-left:auto;margin-right:auto;" onclick="location.reload()">Try Again</button>
+  </div>
+</div>
+
+<script>
+const API_KEY = '53abc1f4686798eadbeb8f91ea79c9bb';
+const TOKEN = 'ATTA612f8bd1394d370da47dab92ba3cd2fba5f5dc6781a8bc2d130309ae84fd4ea9BC12D59B';
+const STORAGE_KEY_PREFIX = 'cf_dispatch_submitted_';
+
+// Get card ID from URL param
+const urlParams = new URLSearchParams(window.location.search);
+const CARD_ID = urlParams.get('card');
+
+// ── Helpers ──────────────────────────────────────────────────────
+function trelloFetch(path, method = 'GET', body = null) {
+  const sep = path.includes('?') ? '&' : '?';
+  const url = `https://api.trello.com/1${path}${sep}key=${API_KEY}&token=${TOKEN}`;
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(url, opts).then(r => {
+    if (!r.ok) throw new Error(`Trello API error ${r.status}`);
+    return r.json();
+  });
+}
+
+function formatPhone(input) {
+  const digits = input.replace(/\D/g, '');
+  if (digits.length === 10) return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits[0] === '1') return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+  return input;
+}
+
+function validatePhone(val) {
+  return val.replace(/\D/g, '').length >= 10;
+}
+
+function setProgress(pct) {
+  document.getElementById('load-progress').style.width = pct + '%';
+}
+
+function showError(title, msg) {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('main-form').style.display = 'none';
+  document.getElementById('error-title').textContent = title;
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-screen').style.display = 'block';
+}
+
+// ── Toggle checkbox items ────────────────────────────────────────
+function toggleCheck(el) {
+  const cb = el.querySelector('input[type="checkbox"]');
+  cb.checked = !cb.checked;
+  el.classList.toggle('checked', cb.checked);
+}
+
+// ── Phone formatting on input ───────────────────────────────────
+document.getElementById('customer-phone').addEventListener('blur', function() {
+  if (this.value) this.value = formatPhone(this.value);
+});
+
+// ── Init ─────────────────────────────────────────────────────────
+async function init() {
+  // Animate progress bar
+  setProgress(20);
+
+  if (!CARD_ID) {
+    showError('Missing Card', 'No card ID was provided in the link. Please use the link from the Trello card comment.');
+    return;
+  }
+
+  try {
+    setProgress(50);
+
+    // Fetch card details
+    const card = await trelloFetch(`/cards/${CARD_ID}?fields=name,desc`);
+    setProgress(80);
+
+    document.getElementById('card-name').textContent = card.name;
+    document.title = `Delivery Request — ${card.name}`;
+
+    // Check if already submitted (local storage check)
+    const storageKey = STORAGE_KEY_PREFIX + CARD_ID;
+    if (localStorage.getItem(storageKey)) {
+      document.getElementById('already-submitted').style.display = 'flex';
+    }
+
+    setProgress(100);
+    setTimeout(() => {
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('main-form').style.display = 'block';
+    }, 300);
+
+  } catch (err) {
+    showError('Could not load card', 'Unable to connect to Trello. Please check your connection and try again.');
+  }
+}
+
+// ── Validate ──────────────────────────────────────────────────────
+function validate() {
+  let valid = true;
+
+  const nameField = document.getElementById('field-customer-name');
+  const nameVal = document.getElementById('customer-name').value.trim();
+  if (!nameVal) {
+    nameField.classList.add('has-error');
+    valid = false;
+  } else {
+    nameField.classList.remove('has-error');
+  }
+
+  const phoneField = document.getElementById('field-customer-phone');
+  const phoneVal = document.getElementById('customer-phone').value.trim();
+  if (!phoneVal || !validatePhone(phoneVal)) {
+    phoneField.classList.add('has-error');
+    valid = false;
+  } else {
+    phoneField.classList.remove('has-error');
+  }
+
+  return valid;
+}
+
+// ── Submit ────────────────────────────────────────────────────────
+async function submitForm() {
+  if (!validate()) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Submitting...';
+
+  try {
+    const customerName = document.getElementById('customer-name').value.trim();
+    const customerPhone = formatPhone(document.getElementById('customer-phone').value.trim());
+    const stairs = document.getElementById('chk-stairs').checked;
+    const removal = document.getElementById('chk-removal').checked;
+    const whiteglove = document.getElementById('chk-whiteglove').checked;
+    const dropoff = document.getElementById('chk-dropoff').checked;
+    const firststop = document.getElementById('chk-firststop').checked;
+    const notes = document.getElementById('delivery-notes').value.trim();
+
+    // Build checklist content
+    const instructions = [
+      stairs      ? '☑ Stairs / Elevator' : '☐ Stairs / Elevator',
+      removal     ? '☑ Equipment Removal' : '☐ Equipment Removal',
+      whiteglove  ? '☑ White Glove Service' : '☐ White Glove Service',
+      dropoff     ? '☑ Drop-off Only' : '☐ Drop-off Only',
+    ].join('\n');
+
+    // Build comment to post on card
+    const firstStopLine = firststop ? '\n🥇 *FIRST STOP REQUESTED*' : '';
+    const notesLine = notes ? `\n📝 Notes: ${notes}` : '';
+
+    const comment = `📋 *Delivery Instructions Submitted*
+━━━━━━━━━━━━━━━━━━━━━━
+👤 Customer: ${customerName}
+📞 Phone: ${customerPhone}
+━━━━━━━━━━━━━━━━━━━━━━
+${instructions}${firstStopLine}${notesLine}
+━━━━━━━━━━━━━━━━━━━━━━
+_Submitted via CF Dispatch Request Form_`;
+
+    // Post comment to card
+    await trelloFetch(`/cards/${CARD_ID}/actions/comments`, 'POST', { text: comment });
+
+    // Mark as submitted locally
+    localStorage.setItem(STORAGE_KEY_PREFIX + CARD_ID, new Date().toISOString());
+
+    // Show success
+    document.getElementById('main-form').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'block';
+
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = '<span>📋</span> Submit Delivery Request';
+    showError('Submission Failed', 'Could not save to Trello. Please check your connection and try again. Your selections have not been lost — scroll up and resubmit.');
+  }
+}
+
+// ── Start ──────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
