@@ -310,6 +310,35 @@ body {
   font-style: italic;
 }
 
+/* S31: Reject button on pending cards (manager only, hover-reveal) */
+.qc-reject-btn {
+  position: absolute;
+  top: 44px; right: 14px;
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.02);
+  color: rgba(0,0,0,0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: all 0.15s;
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+}
+.queue-card:hover .qc-reject-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.qc-reject-btn:hover {
+  background: rgba(224,122,95,0.12);
+  border-color: rgba(224,122,95,0.3);
+  color: var(--danger);
+}
+
 /* Algo recommendation strip */
 .algo-strip {
   display: flex;
@@ -2047,6 +2076,7 @@ let state = {
   mapRouteLines: {},
   unscheduledMarkers: [],
   truckDrivers: {},      // { 'MON-W1-A': driverId, 'MON-W1-B': driverId } — manager-assigned per day
+  staffMap: {},           // S31: { trelloMemberId: { name, trelloPK, trelloSO, trelloShipper, slackId } }
 };
 
 // ════════════════════════════════════════════════════════
@@ -3013,6 +3043,7 @@ function buildQueueCard(card) {
     ondragstart="dragQueueCard(event,'${card.id}')"
     ondragend="endDragQueueCard(event)">
     ${avatarHtml}
+    ${state.viewMode === 'manager' ? `<button class="qc-reject-btn" onclick="event.stopPropagation();rejectCard('${card.id}')" title="Return to salesperson">✕</button>` : ''}
     <div class="qc-title">${card.name}</div>
     ${addressLine}
     <div class="qc-flags">${tagStrip}</div>
@@ -4032,6 +4063,70 @@ function removeStop(dayKey, truck, idx) {
   );
 }
 
+// S31: Reject pending card — move from RFS to owner's PK list (Butler bouncebacks handle OPEN SO routing)
+function rejectCard(cardId) {
+  hideCardPopover();
+  const card = state.queueCards.find(c => c.id === cardId);
+  if (!card) return;
+
+  showConfirm(
+    '↩',
+    'Return to salesperson?',
+    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling and returns it to the salesperson.`,
+    async () => {
+      // 1. Remove from local state immediately
+      state.queueCards = state.queueCards.filter(c => c.id !== cardId);
+      renderQueue();
+      renderMap();
+      showToast(`↩ ${card.name.split(' ').slice(0,3).join(' ')}… returned`, 'info');
+
+      // 2. Find owner's PK list via staffMap and move card
+      try {
+        const cardData = await trello(`/cards/${cardId}?fields=idMembers`);
+        const memberId = cardData.idMembers?.[0];
+        let moved = false;
+
+        // Primary path: staffMap lookup (reads Trello PK from STAFF INFO)
+        if (memberId && state.staffMap?.[memberId]?.trelloPK) {
+          const primaryPK = state.staffMap[memberId].trelloPK.split(',')[0].trim();
+          const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
+          const targetList = lists.find(l => l.name === primaryPK);
+          if (targetList) {
+            await trello(`/cards/${cardId}`, 'PUT', { idList: targetList.id });
+            moved = true;
+          }
+        }
+
+        // Fallback: first-name match against PK lists (mirrors commit pattern)
+        if (!moved && memberId) {
+          try {
+            const member = await trello(`/members/${memberId}?fields=fullName`);
+            const firstName = member?.fullName?.split(' ')[0] || '';
+            if (firstName) {
+              const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
+              const pkList = lists.find(l => {
+                const ln = l.name.toLowerCase();
+                return ln.includes('pk') && ln.includes(firstName.toLowerCase()) && !ln.includes('shipper');
+              });
+              if (pkList) {
+                await trello(`/cards/${cardId}`, 'PUT', { idList: pkList.id });
+                moved = true;
+              }
+            }
+          } catch(e) { console.warn('Reject fallback: member lookup failed', e); }
+        }
+
+        if (!moved) {
+          showToast('⚠ Removed from queue but could not find PK list — check Trello', 'warning');
+        }
+      } catch(e) {
+        console.warn('Reject: could not move card', e);
+        showToast('⚠ Removed from queue but Trello move failed', 'warning');
+      }
+    }
+  );
+}
+
 function editStop(dayKey, truck, idx) {
   const stop = state.schedule[dayKey]?.[truck]?.[idx];
   if (!stop) return;
@@ -4511,6 +4606,29 @@ async function loadDrivers() {
   // S27: Load staff cards from DISPATCH TRELLO list, filter by Job: "Driver"
   const DISPATCH_TRELLO_LIST = '699df279600f35c809d451af';
   const cards = await trello(`/lists/${DISPATCH_TRELLO_LIST}/cards?attachments=true&checklists=all&fields=id,name,due,start,desc&limit=50`);
+  
+  // S31: Build staffMap for all team members (used by rejectCard for PK list lookup)
+  state.staffMap = {};
+  cards.forEach(c => {
+    const staffInfo = c.checklists?.find(cl => cl.name.toLowerCase().includes('staff info'));
+    if (!staffInfo) return;
+    const fields = {};
+    staffInfo.checkItems?.forEach(item => {
+      const match = item.name.trim().match(/^([^:]+):\s*(.+)$/);
+      if (match) fields[match[1].trim().toLowerCase()] = match[2].trim();
+    });
+    const trelloId = fields['trello id'];
+    if (trelloId) {
+      state.staffMap[trelloId] = {
+        name: c.name,
+        trelloPK: fields['trello pk'] || null,
+        trelloSO: fields['trello so'] || null,
+        trelloShipper: fields['trello shipper'] || null,
+        slackId: fields['slack id'] || null,
+        mobile: fields['mobile'] || null,
+      };
+    }
+  });
   
   state.drivers = cards
     .filter(c => {
