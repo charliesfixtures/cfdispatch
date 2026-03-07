@@ -310,32 +310,28 @@ body {
   font-style: italic;
 }
 
-/* S31: Reject button on pending cards (manager only, hover-reveal) */
-.qc-reject-btn {
-  position: absolute;
-  top: 44px; right: 14px;
-  width: 20px; height: 20px;
-  border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: rgba(0,0,0,0.02);
-  color: rgba(0,0,0,0.15);
-  cursor: pointer;
+/* S31: Reject button in detail popover (manager only) */
+.popover-reject-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 4px 0 0 0;
+}
+.popover-reject-btn {
   font-size: 10px;
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(224,122,95,0.2);
+  background: rgba(224,122,95,0.06);
+  color: rgba(200,90,60,0.6);
+  cursor: pointer;
   transition: all 0.15s;
-  z-index: 6;
-  opacity: 0;
-  pointer-events: none;
 }
-.queue-card:hover .qc-reject-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-.qc-reject-btn:hover {
-  background: rgba(224,122,95,0.12);
-  border-color: rgba(224,122,95,0.3);
+.popover-reject-btn:hover {
+  background: rgba(224,122,95,0.15);
+  border-color: rgba(224,122,95,0.4);
   color: var(--danger);
 }
 
@@ -3043,7 +3039,6 @@ function buildQueueCard(card) {
     ondragstart="dragQueueCard(event,'${card.id}')"
     ondragend="endDragQueueCard(event)">
     ${avatarHtml}
-    ${state.viewMode === 'manager' ? `<button class="qc-reject-btn" onclick="event.stopPropagation();rejectCard('${card.id}')" title="Return to salesperson">✕</button>` : ''}
     <div class="qc-title">${card.name}</div>
     ${addressLine}
     <div class="qc-flags">${tagStrip}</div>
@@ -3394,6 +3389,13 @@ function buildPopoverContent(data, type, dayKey, truck, stopIdx) {
         <span style="font-size:10px;color:rgba(0,0,0,0.4)">Free delivery (ride-along)</span>
         <span class="free-toggle ${card.rider ? 'active' : ''}" onclick="event.stopPropagation();toggleRider('${card.id}');hideCardPopover()">${card.rider ? '✓ FREE' : 'Mark free'}</span>
       </div>`;
+      // S31: Reject button — manager only, inside detail view for intentional action
+      if (state.viewMode === 'manager') {
+        html += `<div class="popover-reject-row">
+          <span style="font-size:10px;color:rgba(0,0,0,0.4)">Return to OPEN SO</span>
+          <span class="popover-reject-btn" onclick="event.stopPropagation();rejectCard('${card.id}')">✕ Return</span>
+        </div>`;
+      }
     }
   }
 
@@ -4071,8 +4073,8 @@ function rejectCard(cardId) {
 
   showConfirm(
     '↩',
-    'Return to salesperson?',
-    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling and returns it to the salesperson.`,
+    'Return to OPEN SO?',
+    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling and returns it to the salesperson's queue.`,
     async () => {
       // 1. Remove from local state immediately
       state.queueCards = state.queueCards.filter(c => c.id !== cardId);
