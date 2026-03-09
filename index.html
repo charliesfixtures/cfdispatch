@@ -1,4 +1,4 @@
-<!-- CF Dispatch · S25 · v1.2 · 2026-03-04 -->
+<!-- CF Dispatch · S32 · v1.0 · 2026-03-07 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -198,7 +198,7 @@ body {
   background: rgba(0,0,0,0.04);
   border: 1px solid rgba(0,0,0,0.08);
   border-radius: 8px;
-  padding: 7px 10px 7px 28px;
+  padding: 7px 28px 7px 28px;
   color: rgba(0,0,0,0.7);
   font-family: 'Inter Tight', sans-serif;
   font-size: 12px;
@@ -210,13 +210,65 @@ body {
 .panel-search input::placeholder { color: rgba(0,0,0,0.25); }
 
 .panel-search::before {
-  content: '🔍';
+  content: '📍';
   position: absolute;
   left: 9px;
   top: 50%;
   transform: translateY(-50%);
   font-size: 11px;
   pointer-events: none;
+}
+
+/* S32: Address search clear button */
+.panel-search .search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.08);
+  color: rgba(0,0,0,0.4);
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.panel-search .search-clear:hover {
+  background: rgba(0,0,0,0.14);
+  color: rgba(0,0,0,0.6);
+}
+
+/* S32: Search pin marker on map */
+.search-pin-icon {
+  font-size: 28px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  animation: searchPinDrop 0.35s ease-out;
+}
+@keyframes searchPinDrop {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.search-pin-pulse {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(220,60,60,0.25);
+  animation: searchPulse 2s ease-in-out infinite;
+}
+@keyframes searchPulse {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.6; }
+  50% { transform: translateX(-50%) scale(2.2); opacity: 0; }
 }
 
 .cards-list {
@@ -1752,7 +1804,8 @@ body {
         <span class="badge" id="queue-badge">0</span>
       </div>
       <div class="panel-search">
-        <input type="text" placeholder="Search cards..." id="queue-search" oninput="filterQueue()" />
+        <input type="text" placeholder="Search address..." id="address-search" onkeydown="if(event.key==='Enter'){searchAddress();event.preventDefault()}" />
+        <button class="search-clear" id="search-clear-btn" onclick="clearSearchPin()" title="Clear pin">✕</button>
       </div>
     </div>
     <div class="cards-list" id="cards-list"
@@ -2057,7 +2110,7 @@ let state = {
   queueCards: [],        // unscheduled cards from "RFS" list
   schedule: {},          // { 'MON-W1': { A: [...stops], B: [...stops], C: [...stops] } }
   selectedCard: null,
-  activeDayFilter: 'ALL',
+  activeDays: {},          // S32: { 'MON-W1': true, 'TUE-W1': true, ... } — multi-toggle day pills
   activeWeek: 1,
   activeRightDay: 'MON-W1',
   pendingSuggestion: null,
@@ -2073,6 +2126,7 @@ let state = {
   unscheduledMarkers: [],
   truckDrivers: {},      // { 'MON-W1-A': driverId, 'MON-W1-B': driverId } — manager-assigned per day
   staffMap: {},           // S31: { trelloMemberId: { name, trelloPK, trelloSO, trelloShipper, slackId } }
+  searchPin: null,        // S32: Leaflet marker for address lookup pin (📍)
 };
 
 // ════════════════════════════════════════════════════════
@@ -2553,7 +2607,7 @@ function clearRoutePreview() {
 function renderMap() {
   // Clear preview if active
   clearRoutePreview();
-  // Clear existing
+  // Clear existing (preserve search pin — managed separately)
   Object.values(state.mapMarkers).flat().forEach(m => m.remove());
   Object.values(state.mapRouteLines).flat().forEach(l => l.remove());
   state.unscheduledMarkers.forEach(m => m.remove());
@@ -2562,10 +2616,9 @@ function renderMap() {
   state.unscheduledMarkers = [];
 
   const allDays = [...getWeekDates(0), ...getWeekDates(1)];
-  const activeFilter = state.activeDayFilter;
 
   for (const { day, key } of allDays) {
-    if (activeFilter !== 'ALL' && key !== activeFilter) continue;
+    if (!state.activeDays[key]) continue;
 
     const weekNum = key.includes('W1') ? 1 : 2;
     const dayColor = getDayColor(day, key);
@@ -2646,6 +2699,16 @@ function renderMap() {
           .bindTooltip(stopTipHtml, { permanent: false, direction: 'right', offset: [12, 0], className: 'dot-tip', interactive: false })
           .addTo(map);
 
+        // S32: Click scheduled dot → focus right panel on that day
+        const dotDayKey = key;
+        marker.on('click', () => {
+          if (state.activeRightDay !== dotDayKey) {
+            state.activeRightDay = dotDayKey;
+            renderDayPills();
+            renderRightPanel();
+          }
+        });
+
         if (!state.mapMarkers[key]) state.mapMarkers[key] = [];
         state.mapMarkers[key].push(marker);
       });
@@ -2720,12 +2783,10 @@ function renderMap() {
 
 // ── ROUTE ANIMATION CONTROL ──
 // Determines which route lines animate based on current view state:
-// ALL + no selection → all animate
-// ALL + card selected → only that card's route animates, others dim
-// Day + no selection → all routes for that day animate
-// Day + card selected → only that card's route animates, others dim
+// S32: Multi-toggle — only visible days' routes are on the map
+// No selection → all visible routes animate
+// Card selected → only that card's route animates, others dim
 function updateRouteAnimation() {
-  const activeFilter = state.activeDayFilter;
   const selectedCard = state.selectedCard;
 
   // Find which route the selected card is on (if scheduled)
@@ -2893,7 +2954,6 @@ function buildTagStrip(data, phase) {
 function renderQueue() {
   const list = document.getElementById('cards-list');
   const badge = document.getElementById('queue-badge');
-  const search = document.getElementById('queue-search').value.toLowerCase();
 
   // Sort queue: RS date ascending (earliest requested first), then card creation date (oldest first)
   state.queueCards.sort((a, b) => {
@@ -2911,10 +2971,7 @@ function renderQueue() {
     return createdA - createdB;
   });
 
-  const filtered = state.queueCards.filter(c =>
-    c.name.toLowerCase().includes(search) ||
-    (c.address || '').toLowerCase().includes(search)
-  );
+  const filtered = state.queueCards;
 
   badge.textContent = state.queueCards.length;
   badge.className = 'badge' + (state.queueCards.length > 0 ? ' has-items' : '');
@@ -2922,8 +2979,8 @@ function renderQueue() {
   if (!filtered.length) {
     list.innerHTML = `<div class="empty-state">
       <div class="icon">📭</div>
-      <div class="title">${search ? 'No matches' : 'No pending requests'}</div>
-      <div class="sub">${search ? 'Try a different search' : 'Cards will appear here when salespeople fill the RS field in Trello'}</div>
+      <div class="title">No pending requests</div>
+      <div class="sub">Cards will appear here when salespeople fill the RS field in Trello</div>
     </div>`;
     return;
   }
@@ -3055,7 +3112,7 @@ function renderRightPanel() {
   renderRouteSheet();
 }
 
-// Day tabs removed — center pills now control right panel via setDayFilter()
+// Day tabs removed — center pills now control right panel via toggleDayPill()
 
 function renderRouteSheet() {
   const panel = document.getElementById('route-panel');
@@ -4873,13 +4930,28 @@ function renderDayPills() {
   const allDays = [...week1, ...week2];
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  let html = `<div class="day-pill ${state.activeDayFilter === 'ALL' ? 'active' : ''}" style="${state.activeDayFilter === 'ALL' ? 'background:#f0c93a;border-color:#f0c93a' : ''}" onclick="setDayFilter('ALL')"><span class="pill-day">ALL</span></div>`;
-
+  // S32: No ALL pill — each day is a toggle
+  let html = '';
   allDays.forEach(({ day, date, key }) => {
-    const isActive = state.activeDayFilter === key;
+    const isVisible = !!state.activeDays[key];
+    const isRightPanelDay = state.activeRightDay === key;
     const dayColor = getDayColor(day, key);
-    const activeStyle = isActive ? `background:${dayColor};border-color:${dayColor}` : '';
-    html += `<div class="day-pill ${isActive ? 'active' : ''}" style="${activeStyle}" onclick="setDayFilter('${key}')">
+
+    // Active (visible on map) = colored background
+    // Right panel day = ring/border highlight so you know which day's trucks are shown
+    let pillStyle = '';
+    let pillClass = 'day-pill';
+    if (isVisible) {
+      pillClass += ' active';
+      pillStyle = `background:${dayColor};border-color:${dayColor}`;
+      if (isRightPanelDay) {
+        pillStyle += `;box-shadow:0 0 0 2px rgba(0,0,0,0.5), 0 2px 12px rgba(0,0,0,0.15)`;
+      }
+    } else if (isRightPanelDay) {
+      pillStyle = `border-color:rgba(0,0,0,0.3)`;
+    }
+
+    html += `<div class="${pillClass}" style="${pillStyle}" onclick="toggleDayPill('${key}')">
       <span class="pill-day">${day}</span>
       <span class="pill-date">${date.getDate()} ${months[date.getMonth()]}</span>
     </div>`;
@@ -4958,26 +5030,17 @@ function updateViewModeToggle() {
 }
 
 
-function setDayFilter(key) {
-  state.activeDayFilter = key;
-
-  // Also update right panel to show the selected day's routes
-  if (key !== 'ALL') {
-    state.activeRightDay = key;
+// S32: Multi-toggle day pills — replaces single setDayFilter
+function toggleDayPill(key) {
+  // Toggle visibility on map
+  if (state.activeDays[key]) {
+    delete state.activeDays[key];
   } else {
-    // ALL selected — show today's date (or nearest working day)
-    const now = new Date();
-    const todayName = ['SUN','MON','TUE','WED','THU','FRI','SAT'][now.getDay()];
-    const allDates = [...getWeekDates(0), ...getWeekDates(1)];
-    const today = allDates.find(d => {
-      const s = d.date;
-      return s.getFullYear() === now.getFullYear() && s.getMonth() === now.getMonth() && s.getDate() === now.getDate();
-    });
-    if (today) {
-      state.activeRightDay = today.key;
-    }
-    // If today isn't in the 10-day window, keep current activeRightDay
+    state.activeDays[key] = true;
   }
+
+  // Always set right panel to last-tapped day (even if toggled off — user may want to see trucks)
+  state.activeRightDay = key;
 
   renderDayPills();
   renderRightPanel();
@@ -5086,6 +5149,9 @@ async function performLogin() {
     const week1 = getWeekDates(0);
     state.activeRightDay = week1[0].key;
 
+    // S32: Initialize all days as visible (replaces ALL view default)
+    [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+
     updateViewModeToggle();
     renderDayPills();
     renderQueue();
@@ -5136,6 +5202,91 @@ async function refreshData() {
 }
 
 // ════════════════════════════════════════════════════════
+// S32: ADDRESS SEARCH (Nominatim geocoding + map pin)
+// ════════════════════════════════════════════════════════
+async function searchAddress() {
+  const input = document.getElementById('address-search');
+  const clearBtn = document.getElementById('search-clear-btn');
+  const query = input.value.trim();
+  if (!query) return;
+
+  // Show loading state
+  input.style.opacity = '0.5';
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&countrycodes=us`;
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'CFDispatch/1.0 (charliesfixtures.com)' }
+    });
+    const results = await resp.json();
+
+    if (!results || results.length === 0) {
+      showToast('📍 Address not found — try a more specific address', 'error');
+      input.style.opacity = '1';
+      return;
+    }
+
+    const result = results[0];
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    const displayName = result.display_name || query;
+
+    // Clear any existing search pin
+    if (state.searchPin) {
+      state.searchPin.remove();
+      state.searchPin = null;
+    }
+
+    // Create 📍 pin with pulse effect
+    const pinIcon = L.divIcon({
+      className: '',
+      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center">
+        <div class="search-pin-icon">📍</div>
+        <div class="search-pin-pulse"></div>
+      </div>`,
+      iconSize: [28, 36],
+      iconAnchor: [14, 34]
+    });
+
+    // Build tooltip — short address (first 2 segments)
+    const shortAddr = displayName.split(',').slice(0, 3).join(',').trim();
+    const tipHtml = `<div class="dt-name">📍 Address Lookup</div><div class="dt-owner">${shortAddr}</div>`;
+
+    // Drop pin on map
+    state.searchPin = L.marker([lat, lng], { icon: pinIcon, zIndexOffset: 1000 })
+      .bindTooltip(tipHtml, { permanent: false, direction: 'right', offset: [14, -12], className: 'dot-tip', interactive: false })
+      .addTo(map);
+
+    // Pan map to pin location
+    map.flyTo([lat, lng], 13, { duration: 0.8 });
+
+    // Show clear button
+    clearBtn.style.display = 'flex';
+
+    showToast(`📍 ${shortAddr}`, 'info');
+  } catch (err) {
+    console.error('Address search failed:', err);
+    showToast('📍 Search failed — check your connection', 'error');
+  }
+
+  input.style.opacity = '1';
+}
+
+function clearSearchPin() {
+  // Remove pin from map
+  if (state.searchPin) {
+    state.searchPin.remove();
+    state.searchPin = null;
+  }
+
+  // Clear input and hide X button
+  const input = document.getElementById('address-search');
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════
 // AUTO SYNC
 // ════════════════════════════════════════════════════════
 setInterval(loadData, 60000);
@@ -5169,6 +5320,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const week1 = getWeekDates(0);
   state.activeRightDay = week1[0].key;
+
+  // S32: Initialize all days as visible (replaces ALL view default)
+  [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
 
   renderDayPills();
   updateViewModeToggle();
