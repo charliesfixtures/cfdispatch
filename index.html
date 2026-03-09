@@ -3134,6 +3134,19 @@ function renderRouteSheet() {
   const panel = document.getElementById('route-panel');
   const key = state.activeRightDay;
 
+  // S33: No day selected — show empty state
+  if (!key) {
+    panel.innerHTML = `<div class="route-day-header">
+      <div class="route-day-info">
+        <div class="route-day-name" style="color:rgba(0,0,0,0.3)">No day selected</div>
+      </div>
+    </div>
+    <div style="padding:40px 16px;text-align:center;color:rgba(0,0,0,0.25);font-family:'Inter Tight',sans-serif;font-size:12px;">
+      Toggle a day pill to view routes
+    </div>`;
+    return;
+  }
+
   const dates = [...getWeekDates(0), ...getWeekDates(1)];
   const dayInfo = dates.find(d => d.key === key);
 
@@ -4961,8 +4974,8 @@ function renderDayPills() {
     const b = parseInt(hex.substring(4,6),16);
 
     // Active (visible on map) = ghost tint (8% opacity)
-    // Right panel day = subtle ring highlight
-    // Inactive = fully transparent (plain text, no border)
+    // Right panel day = subtle ring highlight (only when active)
+    // Inactive = fully transparent (plain text, no border, no exceptions)
     let pillStyle = '';
     let pillClass = 'day-pill';
     if (isVisible) {
@@ -4973,9 +4986,6 @@ function renderDayPills() {
       }
     } else {
       pillStyle = `background:transparent;border-color:transparent`;
-      if (isRightPanelDay) {
-        pillStyle = `background:transparent;border-color:rgba(0,0,0,0.15)`;
-      }
     }
 
     html += `<div class="${pillClass}" style="${pillStyle}" onclick="toggleDayPill('${key}')">
@@ -5058,21 +5068,31 @@ function updateViewModeToggle() {
 
 
 // S32: Multi-toggle day pills — replaces single setDayFilter
+// S33: Smart 3-state interaction:
+//   OFF pill → turn ON + right panel shows it
+//   ON pill (not right panel) → right panel switches to it (stays ON)
+//   ON pill (IS right panel) → turn OFF + right panel clears
 function toggleDayPill(key) {
-  // Toggle visibility on map
-  if (state.activeDays[key]) {
-    delete state.activeDays[key];
-  } else {
-    state.activeDays[key] = true;
-  }
+  const isOn = !!state.activeDays[key];
+  const isRightPanel = state.activeRightDay === key;
 
-  // Always set right panel to last-tapped day (even if toggled off — user may want to see trucks)
-  state.activeRightDay = key;
+  if (!isOn) {
+    // OFF → turn ON + become right panel day
+    state.activeDays[key] = true;
+    state.activeRightDay = key;
+  } else if (isOn && !isRightPanel) {
+    // ON but not right panel → just switch right panel, don't toggle off
+    state.activeRightDay = key;
+  } else {
+    // ON and IS right panel → turn OFF + clear right panel
+    delete state.activeDays[key];
+    state.activeRightDay = null;
+  }
 
   // S33: Persist toggle state across refreshes
   try {
     localStorage.setItem('cf_dispatch_activeDays', JSON.stringify(state.activeDays));
-    localStorage.setItem('cf_dispatch_activeRightDay', state.activeRightDay);
+    localStorage.setItem('cf_dispatch_activeRightDay', state.activeRightDay || '');
   } catch {}
 
   renderDayPills();
@@ -5188,10 +5208,11 @@ async function performLogin() {
       const savedRight = localStorage.getItem('cf_dispatch_activeRightDay');
       if (savedDays) {
         state.activeDays = JSON.parse(savedDays);
+        // Restore right panel day — empty string means user cleared it (null)
+        state.activeRightDay = (savedRight === null) ? week1[0].key : (savedRight || null);
       } else {
         [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
       }
-      if (savedRight) state.activeRightDay = savedRight;
     } catch {
       [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
     }
@@ -5371,10 +5392,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedRight = localStorage.getItem('cf_dispatch_activeRightDay');
     if (savedDays) {
       state.activeDays = JSON.parse(savedDays);
+      // Restore right panel day — empty string means user cleared it (null)
+      state.activeRightDay = (savedRight === null) ? week1[0].key : (savedRight || null);
     } else {
       [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
     }
-    if (savedRight) state.activeRightDay = savedRight;
   } catch {
     [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
   }
