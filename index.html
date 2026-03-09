@@ -608,6 +608,19 @@ body {
 .day-pill.active { color: rgba(0,0,0,0.55); font-weight: 700; }
 .day-pill.active .pill-date { color: rgba(0,0,0,0.35); }
 
+/* S33: Staged notification dot — uncommitted cards waiting on this day */
+.pill-staged-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(224, 122, 95, 0.8);
+  border: 1.5px solid rgba(255,255,255,0.9);
+  pointer-events: none;
+}
+
 /* ── RIGHT PANEL ──────────────────────────────────────── */
 .panel-right {
   position: fixed;
@@ -3144,8 +3157,13 @@ function renderRouteSheet() {
     <div style="padding:40px 16px;text-align:center;color:rgba(0,0,0,0.25);font-family:'Inter Tight',sans-serif;font-size:12px;">
       Toggle a day pill to view routes
     </div>`;
+    const truckWrap = document.getElementById('truck-c-wrap');
+    if (truckWrap) truckWrap.style.display = 'none';
     return;
   }
+  // Restore truck buttons when day is selected
+  const truckWrap = document.getElementById('truck-c-wrap');
+  if (truckWrap) truckWrap.style.display = '';
 
   const dates = [...getWeekDates(0), ...getWeekDates(1)];
   const dayInfo = dates.find(d => d.key === key);
@@ -4988,9 +5006,15 @@ function renderDayPills() {
       pillStyle = `background:transparent;border-color:transparent`;
     }
 
+    // S33: Staged dot — orange notification dot if day has uncommitted cards
+    const daySchedule = state.schedule[key] || {};
+    const stagedCount = Object.values(daySchedule).flat().filter(s => !s.committed).length;
+    const stagedDot = stagedCount > 0 ? '<div class="pill-staged-dot"></div>' : '';
+
     html += `<div class="${pillClass}" style="${pillStyle}" onclick="toggleDayPill('${key}')">
       <span class="pill-day">${day}</span>
       <span class="pill-date">${date.getDate()} ${months[date.getMonth()]}</span>
+      ${stagedDot}
     </div>`;
   });
   container.innerHTML = html;
