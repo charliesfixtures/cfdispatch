@@ -5069,6 +5069,12 @@ function toggleDayPill(key) {
   // Always set right panel to last-tapped day (even if toggled off — user may want to see trucks)
   state.activeRightDay = key;
 
+  // S33: Persist toggle state across refreshes
+  try {
+    localStorage.setItem('cf_dispatch_activeDays', JSON.stringify(state.activeDays));
+    localStorage.setItem('cf_dispatch_activeRightDay', state.activeRightDay);
+  } catch {}
+
   renderDayPills();
   renderRightPanel();
   renderMap();
@@ -5176,8 +5182,19 @@ async function performLogin() {
     const week1 = getWeekDates(0);
     state.activeRightDay = week1[0].key;
 
-    // S32: Initialize all days as visible (replaces ALL view default)
-    [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+    // S33: Restore pill toggle state from localStorage, fall back to all-on
+    try {
+      const savedDays = localStorage.getItem('cf_dispatch_activeDays');
+      const savedRight = localStorage.getItem('cf_dispatch_activeRightDay');
+      if (savedDays) {
+        state.activeDays = JSON.parse(savedDays);
+      } else {
+        [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+      }
+      if (savedRight) state.activeRightDay = savedRight;
+    } catch {
+      [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+    }
 
     updateViewModeToggle();
     renderDayPills();
@@ -5348,8 +5365,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const week1 = getWeekDates(0);
   state.activeRightDay = week1[0].key;
 
-  // S32: Initialize all days as visible (replaces ALL view default)
-  [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+  // S33: Restore pill toggle state from localStorage, fall back to all-on
+  try {
+    const savedDays = localStorage.getItem('cf_dispatch_activeDays');
+    const savedRight = localStorage.getItem('cf_dispatch_activeRightDay');
+    if (savedDays) {
+      state.activeDays = JSON.parse(savedDays);
+    } else {
+      [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+    }
+    if (savedRight) state.activeRightDay = savedRight;
+  } catch {
+    [...getWeekDates(0), ...getWeekDates(1)].forEach(d => { state.activeDays[d.key] = true; });
+  }
 
   renderDayPills();
   updateViewModeToggle();
