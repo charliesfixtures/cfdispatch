@@ -147,18 +147,21 @@ body {
   z-index: 400;
   display: flex;
   flex-direction: column;
-  gap: 6px;
   max-height: calc(100vh - 32px);
   pointer-events: all;
 }
+
+/* S33: Gap only between search and pending, not between pending and cards */
+.search-bar-container { margin-bottom: 6px; }
 
 .panel-header {
   background: rgba(200,195,185,0.5);
   backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
   -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
   border: 1px solid rgba(255,255,255,0.35);
-  border-radius: var(--radius);
-  padding: 12px 14px 10px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: none;
+  padding: 12px 14px 12px;
   flex-shrink: 0;
   box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
 }
@@ -173,7 +176,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
 }
 
 .badge {
@@ -190,7 +192,18 @@ body {
 
 .panel-search {
   position: relative;
-  margin-top: 6px;
+}
+
+/* S33: Standalone search bar glass container */
+.search-bar-container {
+  background: rgba(200,195,185,0.5);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  flex-shrink: 0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
 }
 
 .panel-search input {
@@ -277,13 +290,13 @@ body {
   gap: 6px;
   overflow-y: auto;
   max-height: calc(100vh - 140px);
-  padding: 6px 0;
+  padding: 0 0 6px 0;
   background: transparent;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.cards-list::-webkit-scrollbar { width: 4px; }
-.cards-list::-webkit-scrollbar-track { background: transparent; }
-.cards-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.14); border-radius: 2px; }
+.cards-list::-webkit-scrollbar { display: none; }
 
 /* Queue card */
 .queue-card {
@@ -592,9 +605,8 @@ body {
 
 .day-pill:hover { color: rgba(0,0,0,0.6); background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.06); }
 .day-pill:hover .pill-date { color: rgba(0,0,0,0.3); }
-.day-pill.active { color: rgba(0,0,0,0.75); font-weight: 700; }
-.day-pill.active:not([style]) { background: var(--accent); border-color: rgba(240,201,58,0.6); box-shadow: 0 2px 12px rgba(240,201,58,0.25), inset 0 1px 0 rgba(255,255,255,0.2); }
-.day-pill.active .pill-date { color: rgba(0,0,0,0.5); }
+.day-pill.active { color: rgba(0,0,0,0.55); font-weight: 700; }
+.day-pill.active .pill-date { color: rgba(0,0,0,0.35); }
 
 /* ── RIGHT PANEL ──────────────────────────────────────── */
 .panel-right {
@@ -1798,14 +1810,18 @@ body {
 
   <!-- LEFT PANEL -->
   <div class="panel-left">
+    <!-- Address Search (standalone map tool) -->
+    <div class="search-bar-container">
+      <div class="panel-search">
+        <input type="text" placeholder="Search address..." id="address-search" onkeydown="if(event.key==='Enter'){searchAddress();event.preventDefault()}" />
+        <button class="search-clear" id="search-clear-btn" onclick="clearSearchPin()" title="Clear pin">✕</button>
+      </div>
+    </div>
+    <!-- Pending Queue -->
     <div class="panel-header">
       <div class="panel-title">
         Pending
         <span class="badge" id="queue-badge">0</span>
-      </div>
-      <div class="panel-search">
-        <input type="text" placeholder="Search address..." id="address-search" onkeydown="if(event.key==='Enter'){searchAddress();event.preventDefault()}" />
-        <button class="search-clear" id="search-clear-btn" onclick="clearSearchPin()" title="Clear pin">✕</button>
       </div>
     </div>
     <div class="cards-list" id="cards-list"
@@ -4931,24 +4947,35 @@ function renderDayPills() {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // S32: No ALL pill — each day is a toggle
+  // S33: Ghost tint pills — barely-there color hint, map polylines are the real visual cue
   let html = '';
   allDays.forEach(({ day, date, key }) => {
     const isVisible = !!state.activeDays[key];
     const isRightPanelDay = state.activeRightDay === key;
     const dayColor = getDayColor(day, key);
 
-    // Active (visible on map) = colored background
-    // Right panel day = ring/border highlight so you know which day's trucks are shown
+    // Convert hex to rgb components for rgba usage
+    const hex = dayColor.replace('#','');
+    const r = parseInt(hex.substring(0,2),16);
+    const g = parseInt(hex.substring(2,4),16);
+    const b = parseInt(hex.substring(4,6),16);
+
+    // Active (visible on map) = ghost tint (8% opacity)
+    // Right panel day = subtle ring highlight
+    // Inactive = fully transparent (plain text, no border)
     let pillStyle = '';
     let pillClass = 'day-pill';
     if (isVisible) {
       pillClass += ' active';
-      pillStyle = `background:${dayColor};border-color:${dayColor}`;
+      pillStyle = `background:rgba(${r},${g},${b},0.08);border-color:rgba(${r},${g},${b},0.18)`;
       if (isRightPanelDay) {
-        pillStyle += `;box-shadow:0 0 0 2px rgba(0,0,0,0.5), 0 2px 12px rgba(0,0,0,0.15)`;
+        pillStyle += `;box-shadow:0 0 0 2px rgba(${r},${g},${b},0.35), 0 1px 6px rgba(0,0,0,0.04)`;
       }
-    } else if (isRightPanelDay) {
-      pillStyle = `border-color:rgba(0,0,0,0.3)`;
+    } else {
+      pillStyle = `background:transparent;border-color:transparent`;
+      if (isRightPanelDay) {
+        pillStyle = `background:transparent;border-color:rgba(0,0,0,0.15)`;
+      }
     }
 
     html += `<div class="${pillClass}" style="${pillStyle}" onclick="toggleDayPill('${key}')">
