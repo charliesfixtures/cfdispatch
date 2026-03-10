@@ -1,4 +1,4 @@
-<!-- CF Dispatch · S34 · v0.1 · 2026-03-10 -->
+<!-- CF Dispatch · S35 · v1.0 · 2026-03-10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1949,14 +1949,17 @@ body {
 <div class="settings-overlay" id="login-overlay" style="display: none;">
   <div class="settings-panel" style="max-width: 400px;">
     <div class="settings-title">🔐 Connect Your Trello Account</div>
-    <div class="settings-sub" style="margin-bottom: 20px;">CF Dispatch requires your Trello personal token to verify your role and permissions.</div>
+    <div class="settings-sub" style="margin-bottom: 20px;">CF Dispatch verifies your identity through Trello. Get your token below.</div>
 
     <div class="settings-section">
       <div class="form-group">
-        <label class="form-label">Trello Personal Token</label>
+        <div style="margin-bottom: 14px;">
+          <a href="https://cf-dispatch-auth.willdsy.workers.dev/api/auth/authorize" target="_blank" rel="noopener" style="display:inline-block; padding: 10px 20px; background: rgba(0,106,166,0.12); color: rgba(0,106,166,0.9); border-radius: 10px; text-decoration: none; font-size: 13px; font-weight: 600; border: 1px solid rgba(0,106,166,0.2); transition: all 0.2s;">📌 Step 1 — Get Your Token from Trello</a>
+        </div>
+        <label class="form-label">Step 2 — Paste Your Token</label>
         <input type="password" class="form-input" id="login-token" placeholder="Paste your token here..." style="font-family: 'DM Mono', monospace; font-size: 11px;" />
         <div style="font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 8px; line-height: 1.5;">
-          <div>📌 Don't have a token? Visit <strong>trello.com/app-key</strong> and create one from the Token section.</div>
+          <div>Click the button above → log in to Trello if asked → click Allow → copy the token shown.</div>
           <div style="margin-top: 6px;">🔒 Your token is verified securely and never stored in the browser.</div>
         </div>
       </div>
