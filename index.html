@@ -3896,6 +3896,27 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
     // Mark as committed in local state
     stop.committed = true;
 
+    // 6. Fire-and-forget: notify #cf-delivery-schedule via Worker Slack webhook
+    // Replaces 8 × A0.2-SCHED DEL Butler rules — posts on every commit
+    try {
+      const cardLink = stop.shortLink ? `https://trello.com/c/${stop.shortLink}` : '';
+      const salesperson = mentionTag ? mentionTag.replace('@', '') : '';
+
+      fetch(`${WORKER_URL}/api/slack/schedule-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SESSION_TOKEN}` },
+        body: JSON.stringify({
+          cardName: stop.cardName || stop.name,
+          day: `${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})}`,
+          route: truck,
+          stopNumber: stopIndex + 1,
+          isOT: false,
+          cardLink: cardLink,
+          salesperson: salesperson
+        })
+      }).catch(e => console.warn('Slack notify failed (non-fatal):', e));
+    } catch(e) { console.warn('Slack notify setup failed (non-fatal):', e); }
+
     renderRightPanel();
     renderMap();
     showToast(`✅ ${stop.cardName || stop.name} committed!`, 'success');
