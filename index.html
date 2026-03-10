@@ -3858,18 +3858,21 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
 
     // 3. Get card owner for @mention and shipper list routing
     let mentionTag = '';
+    let cardLabels = [];
+    let ownerMemberId = null;
     if (stop.cardId) {
-      const cardData = await trello(`/cards/${stop.cardId}?fields=idMembers`);
+      const cardData = await trello(`/cards/${stop.cardId}?fields=idMembers,labels`);
+      cardLabels = (cardData.labels || []).map(l => l.name).filter(Boolean);
       if (cardData.idMembers?.length > 0) {
-        const memberId = cardData.idMembers[0];
-        const member = await trello(`/members/${memberId}?fields=fullName,username`);
+        ownerMemberId = cardData.idMembers[0];
+        const member = await trello(`/members/${ownerMemberId}?fields=fullName,username`);
         if (member.username) mentionTag = `@${member.username}`;
         const firstName = member.fullName?.split(' ')[0] || '';
 
         // 4a. Primary: staffMap.trelloShipper lookup (exact list name, zero extra API calls)
         let moved = false;
-        if (state.staffMap?.[memberId]?.trelloShipper) {
-          const shipperName = state.staffMap[memberId].trelloShipper.split(',')[0].trim();
+        if (state.staffMap?.[ownerMemberId]?.trelloShipper) {
+          const shipperName = state.staffMap[ownerMemberId].trelloShipper.split(',')[0].trim();
           const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
           const shipperList = lists.find(l => l.name === shipperName);
           if (shipperList) {
@@ -3900,19 +3903,20 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
     // Replaces 8 × A0.2-SCHED DEL Butler rules — posts on every commit
     try {
       const cardLink = stop.shortLink ? `https://trello.com/c/${stop.shortLink}` : '';
-      const salesperson = mentionTag ? mentionTag.replace('@', '') : '';
+      const slackId = ownerMemberId ? (state.staffMap?.[ownerMemberId]?.slackId || '') : '';
 
       fetch(`${WORKER_URL}/api/slack/schedule-notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SESSION_TOKEN}` },
         body: JSON.stringify({
           cardName: stop.cardName || stop.name,
-          day: `${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})}`,
+          weekday: dayInfo.day,
+          fullDate: dayInfo.date.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'}),
           route: truck,
           stopNumber: stopIndex + 1,
-          isOT: false,
           cardLink: cardLink,
-          salesperson: salesperson
+          labelNames: cardLabels.join(', '),
+          slackId: slackId
         })
       }).catch(e => console.warn('Slack notify failed (non-fatal):', e));
     } catch(e) { console.warn('Slack notify setup failed (non-fatal):', e); }
