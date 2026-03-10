@@ -1,4 +1,4 @@
-<!-- CF Dispatch · S32 · v1.0 · 2026-03-07 -->
+<!-- CF Dispatch · S34 · v0.1 · 2026-03-10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -373,6 +373,7 @@ body {
   font-family: 'Inter Tight', sans-serif;
   margin-top: 4px;
   font-style: italic;
+  text-align: center;
 }
 
 /* S31: Reject button in detail popover (manager only) */
@@ -2025,7 +2026,7 @@ body {
 const WORKER_URL = 'https://cf-dispatch-auth.willdsy.workers.dev';
 let SESSION_TOKEN = localStorage.getItem('cf_dispatch_session') || null;
 
-const BOARD_ID = '699600604764a1cd3d99dba1'; // TEST BOARD — swap back to 'GpVORoMM' for production launch
+const BOARD_ID = '6961591b0d4dc2126c2983b8'; // MAIN BOARD (CF ASANA)
 const HIDDEN_BOARD_ID = '6965633f4fe5254c47e38527';
 const DRIVERS_LIST_ID = '699df279600f35c809d451af';
 
@@ -3855,19 +3856,30 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
       });
     }
 
-    // 3. Add comment with scheduling info
-    const comment = `📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Route ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n📍 Via CF Dispatch`;
-    await trello(`/cards/${stop.cardId}/actions/comments`, 'POST', { text: comment });
-
-    // 4. Move card to salesperson's shipper list
-    // Find the card owner's shipper list (e.g., "Shipper - William")
+    // 3. Get card owner for @mention and shipper list routing
+    let mentionTag = '';
     if (stop.cardId) {
       const cardData = await trello(`/cards/${stop.cardId}?fields=idMembers`);
       if (cardData.idMembers?.length > 0) {
         const memberId = cardData.idMembers[0];
-        const member = await trello(`/members/${memberId}?fields=fullName`);
+        const member = await trello(`/members/${memberId}?fields=fullName,username`);
+        if (member.username) mentionTag = `@${member.username}`;
         const firstName = member.fullName?.split(' ')[0] || '';
-        if (firstName) {
+
+        // 4a. Primary: staffMap.trelloShipper lookup (exact list name, zero extra API calls)
+        let moved = false;
+        if (state.staffMap?.[memberId]?.trelloShipper) {
+          const shipperName = state.staffMap[memberId].trelloShipper.split(',')[0].trim();
+          const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
+          const shipperList = lists.find(l => l.name === shipperName);
+          if (shipperList) {
+            await trello(`/cards/${stop.cardId}`, 'PUT', { idList: shipperList.id });
+            moved = true;
+          }
+        }
+
+        // 4b. Fallback: first-name match (mirrors reject pattern)
+        if (!moved && firstName) {
           const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
           const shipperList = lists.find(l => l.name.toLowerCase().includes('shipper') && l.name.toLowerCase().includes(firstName.toLowerCase()));
           if (shipperList) {
@@ -3876,6 +3888,10 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
         }
       }
     }
+
+    // 5. Add comment with @mention (triggers Butler → Slack DM to salesperson)
+    const comment = `${mentionTag ? mentionTag + ' ' : ''}📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Route ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n📍 Via CF Dispatch`;
+    await trello(`/cards/${stop.cardId}/actions/comments`, 'POST', { text: comment });
 
     // Mark as committed in local state
     stop.committed = true;
@@ -4146,7 +4162,7 @@ function removeStop(dayKey, truck, idx) {
 
       // 2. Undo Trello in background — each call independent so one failure doesn't block others
       try {
-        const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
+        const lists = await trello(`/boards/${HIDDEN_BOARD_ID}/lists?fields=id,name`);
         const rfsList = lists.find(l => l.name === 'RFS');
         if (rfsList) await trello(`/cards/${cardId}`, 'PUT', { idList: rfsList.id });
       } catch(e) { console.warn('Uncommit: could not move to RFS', e); }
@@ -4163,7 +4179,16 @@ function removeStop(dayKey, truck, idx) {
       } catch(e) { console.warn('Uncommit: could not clear OT field', e); }
 
       try {
-        await trello(`/cards/${cardId}/actions/comments`, 'POST', { text: '🔄 Removed from schedule via CF Dispatch' });
+        // Fetch card owner's @username for Butler → Slack DM notification
+        let mentionTag = '';
+        const cardData = await trello(`/cards/${cardId}?fields=idMembers`);
+        if (cardData.idMembers?.length > 0) {
+          const member = await trello(`/members/${cardData.idMembers[0]}?fields=username`);
+          if (member.username) mentionTag = `@${member.username} `;
+        }
+        const cardName = stop.cardName || stop.name || '';
+        const cardLink = stop.shortLink ? `https://trello.com/c/${stop.shortLink}` : '';
+        await trello(`/cards/${cardId}/actions/comments`, 'POST', { text: `${mentionTag}${cardName} removed from schedule\n${cardLink}\n🔄 Via CF Dispatch` });
       } catch(e) { console.warn('Uncommit: could not post comment', e); }
     }
   );
@@ -4645,13 +4670,13 @@ async function loadData() {
     // Load drivers from hidden board
     await loadDrivers();
 
-    // Load all board lists to find "RFS"
-    const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
-    let rfsListId = lists.find(l => l.name === 'RFS')?.id;
+    // Load lists from HIDDEN board to find "RFS" (RFS lives on hidden board, not main)
+    const hiddenLists = await trello(`/boards/${HIDDEN_BOARD_ID}/lists?fields=id,name`);
+    let rfsListId = hiddenLists.find(l => l.name === 'RFS')?.id;
 
-    // Auto-create if missing
+    // Auto-create if missing (on hidden board)
     if (!rfsListId) {
-      const newList = await trello(`/boards/${BOARD_ID}/lists`, 'POST', { name: 'RFS', pos: 'top' });
+      const newList = await trello(`/boards/${HIDDEN_BOARD_ID}/lists`, 'POST', { name: 'RFS', pos: 'top' });
       rfsListId = newList.id;
       showToast('"RFS" list created', 'info');
     }
@@ -5124,7 +5149,7 @@ function toggleDayPill(key) {
   renderMap();
 }
 
-function filterQueue() { renderQueue(); }
+
 
 function setSyncStatus(type, text) {
   const dot = document.getElementById('sync-dot');
