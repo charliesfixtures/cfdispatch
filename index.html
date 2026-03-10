@@ -4162,7 +4162,7 @@ function removeStop(dayKey, truck, idx) {
 
       // 2. Undo Trello in background — each call independent so one failure doesn't block others
       try {
-        const lists = await trello(`/boards/${HIDDEN_BOARD_ID}/lists?fields=id,name`);
+        const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
         const rfsList = lists.find(l => l.name === 'RFS');
         if (rfsList) await trello(`/cards/${cardId}`, 'PUT', { idList: rfsList.id });
       } catch(e) { console.warn('Uncommit: could not move to RFS', e); }
@@ -4670,13 +4670,13 @@ async function loadData() {
     // Load drivers from hidden board
     await loadDrivers();
 
-    // Load lists from HIDDEN board to find "RFS" (RFS lives on hidden board, not main)
-    const hiddenLists = await trello(`/boards/${HIDDEN_BOARD_ID}/lists?fields=id,name`);
-    let rfsListId = hiddenLists.find(l => l.name === 'RFS')?.id;
+    // Load all board lists to find "RFS" (RFS lives on main board to preserve card members)
+    const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
+    let rfsListId = lists.find(l => l.name === 'RFS')?.id;
 
-    // Auto-create if missing (on hidden board)
+    // Auto-create if missing
     if (!rfsListId) {
-      const newList = await trello(`/boards/${HIDDEN_BOARD_ID}/lists`, 'POST', { name: 'RFS', pos: 'top' });
+      const newList = await trello(`/boards/${BOARD_ID}/lists`, 'POST', { name: 'RFS', pos: 'top' });
       rfsListId = newList.id;
       showToast('"RFS" list created', 'info');
     }
