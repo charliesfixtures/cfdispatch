@@ -3893,7 +3893,8 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
     }
 
     // 5. Add comment with @mention (triggers Butler → Slack DM to salesperson)
-    const comment = `${mentionTag ? mentionTag + ' ' : ''}📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Route ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n📍 Via CF Dispatch`;
+    const managerName = (() => { try { return JSON.parse(localStorage.getItem('cf_dispatch_user'))?.fullName || 'Manager'; } catch { return 'Manager'; } })();
+    const comment = `${mentionTag ? mentionTag + ' ' : ''}📦 Scheduled: ${dayInfo.day} ${dayInfo.date.toLocaleDateString('en-US', {month:'short',day:'numeric'})} · Route ${truck} · Stop ${stopIndex + 1}\n🕐 Due: 5:00 PM Pacific\n👔 Committed by ${managerName}\n📍 Via CF Dispatch`;
     await trello(`/cards/${stop.cardId}/actions/comments`, 'POST', { text: comment });
 
     // Mark as committed in local state
@@ -4213,7 +4214,8 @@ function removeStop(dayKey, truck, idx) {
         }
         const cardName = stop.cardName || stop.name || '';
         const cardLink = stop.shortLink ? `https://trello.com/c/${stop.shortLink}` : '';
-        await trello(`/cards/${cardId}/actions/comments`, 'POST', { text: `${mentionTag}${cardName} removed from schedule\n${cardLink}\n🔄 Via CF Dispatch` });
+        const mgrName = (() => { try { return JSON.parse(localStorage.getItem('cf_dispatch_user'))?.fullName || 'Manager'; } catch { return 'Manager'; } })();
+        await trello(`/cards/${cardId}/actions/comments`, 'POST', { text: `${mentionTag}${cardName} removed from schedule\n${cardLink}\n👔 By ${mgrName}\n🔄 Via CF Dispatch` });
       } catch(e) { console.warn('Uncommit: could not post comment', e); }
     }
   );
