@@ -3364,8 +3364,8 @@ function renderRouteSheet() {
   </div>`;
 
   const trucksToRender = ['A'];
-  if (state.showTruckB || (state.schedule[key]?.B || []).length > 0) trucksToRender.push('B');
-  if (state.showTruckC || (state.schedule[key]?.C || []).length > 0) trucksToRender.push('C');
+  if (state.showTruckB || (state.schedule[key]?.B || []).length > 0 || state.lockedTrucks[`${key}-B`]) trucksToRender.push('B');
+  if (state.showTruckC || (state.schedule[key]?.C || []).length > 0 || state.lockedTrucks[`${key}-C`]) trucksToRender.push('C');
 
   for (const truck of trucksToRender) {
     const truckKey = `${key}-${truck}`;
@@ -3852,16 +3852,19 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
       return;
     }
 
-    // Check overflow — same logic as queue→route (Bug 2 fix)
+    // Check overflow — same logic as queue→route (managers bypass distance gate)
     const movedStop = fromStops[fromIdx];
     const ofCheck = checkOverflowAllowed(toStops, movedStop?.coords);
     if (toStops.length >= MAX_STOPS) {
-      if (!ofCheck.allowed) {
+      if (state.viewMode === 'manager') {
+        showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — manager override`, 'warning');
+      } else if (!ofCheck.allowed) {
         showToast(`Route ${truck} is full (${MAX_STOPS} stops) — too far for overflow`, 'error');
         dragData = null;
         return;
+      } else {
+        showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
       }
-      showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
     }
 
     if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
@@ -3916,15 +3919,19 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     return;
   }
 
-  // Reject: full (4 stops) and not within overflow radius
+  // Reject: full (4 stops) and not within overflow radius (managers bypass distance gate)
   const stops = state.schedule[dayKey]?.[truck] || [];
   if (stops.length >= MAX_STOPS) {
-    const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
-    if (minDist > OVERFLOW_RADIUS_MILES) {
-      showToast(`Route ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
-      return;
+    if (state.viewMode === 'manager') {
+      showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — manager override`, 'warning');
+    } else {
+      const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
+      if (minDist > OVERFLOW_RADIUS_MILES) {
+        showToast(`Route ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
+        return;
+      }
+      showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — card is nearby, allowed`, 'warning');
     }
-    showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — card is nearby, allowed`, 'warning');
   }
 
   // Find best insert position using algo (or use specified position)
