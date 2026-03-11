@@ -1,4 +1,4 @@
-<!-- CF Dispatch · S35 · v1.0 · 2026-03-10 -->
+<!-- CF Dispatch · S37 · v1.0 · 2026-03-10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2037,7 +2037,6 @@ const CUSTOM_FIELDS = {
   INV_TOTAL: '696ec194757d725c25438f82',
   AQREF:     '69711644a396debf23689c94',
   RS:        '699deaf8ae2995aa04f30441',
-  OT:        '69839631a61d2fa52d6c0699',
 };
 
 // S29: Dynamic custom field ID lookup — checks state.customFields first, falls back to hardcoded
@@ -2045,7 +2044,7 @@ function getFieldId(name) {
   const dynamic = state.customFields?.find(f => f.name === name);
   if (dynamic) return dynamic.id;
   // Fallback to hardcoded (main board IDs)
-  const map = { 'RS': CUSTOM_FIELDS.RS, 'INV TOTAL': CUSTOM_FIELDS.INV_TOTAL, 'OT': CUSTOM_FIELDS.OT, 'AQREF:': CUSTOM_FIELDS.AQREF };
+  const map = { 'RS': CUSTOM_FIELDS.RS, 'INV TOTAL': CUSTOM_FIELDS.INV_TOTAL, 'AQREF:': CUSTOM_FIELDS.AQREF };
   return map[name] || null;
 }
 
@@ -2105,7 +2104,6 @@ function stopToQueueCard(stop) {
     pickUpMemoDetail: stop.pickUpMemoDetail,
     deliveryNotes: stop.deliveryNotes,
     flags: stop.flags || [],
-    rider: stop.rider,
     queuedAt: stop.queuedAt || null,
   };
 }
@@ -2136,6 +2134,194 @@ function parseMultiValue(fieldValue) {
 }
 
 // ════════════════════════════════════════════════════════
+// S37: STATUS FIELD HELPERS (Base64 encoded scheduling state)
+// ════════════════════════════════════════════════════════
+
+function decodeStatus(base64Value) {
+  if (!base64Value) return null;
+  try {
+    const raw = atob(base64Value);
+    const parts = raw.split('|');
+    if (parts.length < 4) return null;
+    return {
+      state: parts[0],       // 'ST' or 'CM'
+      date: parts[1],        // 'YYYY-MM-DD'
+      truck: parts[2],       // 'A', 'B', 'C'
+      stop: parseInt(parts[3]),
+      stagedBy: parts[4] || ''
+    };
+  } catch (e) {
+    return null; // parse failure → pending
+  }
+}
+
+function dateToDayKey(dateStr) {
+  const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+  const target = new Date(dateStr + 'T12:00:00'); // noon to avoid timezone edge
+  const match = allDays.find(d => d.date.toDateString() === target.toDateString());
+  return match ? match.key : null;
+}
+
+function dayKeyToDateStr(dayKey) {
+  const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+  const dayInfo = allDays.find(d => d.key === dayKey);
+  if (!dayInfo) return null;
+  return dayInfo.date.toISOString().slice(0, 10);
+}
+
+async function writeStatusField(cardId, stateCode, dayKey, truck, stopIndex, stagedBy) {
+  const fieldId = getFieldId('STATUS');
+  if (!fieldId) { console.warn('STATUS field not found'); return; }
+  const dateStr = dayKeyToDateStr(dayKey);
+  if (!dateStr) { console.warn('Could not resolve dayKey to date:', dayKey); return; }
+  const raw = `${stateCode}|${dateStr}|${truck}|${stopIndex}|${stagedBy || ''}`;
+  const encoded = btoa(raw);
+  await trello(`/cards/${cardId}/customField/${fieldId}/item`, 'PUT', { value: { text: encoded } });
+}
+
+async function clearStatusField(cardId) {
+  const fieldId = getFieldId('STATUS');
+  if (!fieldId) return;
+  // Clear by setting empty text value
+  await trello(`/cards/${cardId}/customField/${fieldId}/item`, 'PUT', { value: { text: '' } });
+}
+
+// Sync all stop positions in a truck to STATUS field (after reorder/insert/remove)
+async function syncTruckPositions(dayKey, truck) {
+  const stops = state.schedule[dayKey]?.[truck] || [];
+  const writes = stops.map((stop, i) => {
+    const code = stop.committed ? 'CM' : 'ST';
+    const cardId = stop.cardId || stop.id;
+    return writeStatusField(cardId, code, dayKey, truck, i, stop.stagedBy || '')
+      .catch(e => console.warn(`Position sync failed for ${cardId}:`, e));
+  });
+  return Promise.allSettled(writes);
+}
+
+// ════════════════════════════════════════════════════════
+// S37: DISPATCH CONFIG CARD (locks + driver assignments)
+// ════════════════════════════════════════════════════════
+
+async function loadDispatchConfig() {
+  state.dispatchConfig = { drivers: {}, locks: {} };
+  state.lockedTrucks = {};
+  state.truckDrivers = {};
+
+  try {
+    // Find "SYSTEMS DO NOT TOUCH" list on hidden board
+    const lists = await trello(`/boards/${HIDDEN_BOARD_ID}/lists?fields=id,name`);
+    const sysList = lists.find(l => l.name.includes('SYSTEMS DO NOT TOUCH'));
+    if (!sysList) {
+      console.warn('SYSTEMS DO NOT TOUCH list not found — config will be empty');
+      return;
+    }
+
+    // Find DISPATCH CONFIG card by name
+    const cards = await trello(`/lists/${sysList.id}/cards?fields=id,name,desc`);
+    let configCard = cards.find(c => c.name === 'DISPATCH CONFIG');
+
+    // Create if missing
+    if (!configCard) {
+      configCard = await trello(`/lists/${sysList.id}/cards`, 'POST', { name: 'DISPATCH CONFIG', desc: '' });
+      console.log('Created DISPATCH CONFIG card');
+    }
+
+    state.dispatchConfigCardId = configCard.id;
+
+    // Parse description lines into structured config
+    if (configCard.desc) {
+      const lines = configCard.desc.split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        const match = line.match(/^(\S+):\s*(.+)$/);
+        if (!match) continue;
+        const key = match[1].trim();
+        const value = match[2].trim();
+
+        if (key.endsWith('-DRIVER')) {
+          const dateTruck = key.replace(/-DRIVER$/, '');
+          state.dispatchConfig.drivers[dateTruck] = value;
+        } else if (key.endsWith('-LOCK')) {
+          const dateTruck = key.replace(/-LOCK$/, '');
+          state.dispatchConfig.locks[dateTruck] = true;
+        }
+      }
+    }
+
+    // Map YYYY-MM-DD-TRUCK config keys → dayKey-TRUCK state keys
+    const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+
+    for (const [configKey, _] of Object.entries(state.dispatchConfig.locks)) {
+      const parts = configKey.match(/^(\d{4}-\d{2}-\d{2})-([A-C])$/);
+      if (!parts) continue;
+      const dayKey = dateToDayKey(parts[1]);
+      if (dayKey) {
+        state.lockedTrucks[`${dayKey}-${parts[2]}`] = true;
+      }
+    }
+
+    for (const [configKey, driverName] of Object.entries(state.dispatchConfig.drivers)) {
+      const parts = configKey.match(/^(\d{4}-\d{2}-\d{2})-([A-C])$/);
+      if (!parts) continue;
+      const dayKey = dateToDayKey(parts[1]);
+      if (dayKey) {
+        // Match driver by first name (config stores first name)
+        const driver = state.drivers.find(d =>
+          d.name.split(' ')[0].toLowerCase() === driverName.toLowerCase() ||
+          d.name.toLowerCase() === driverName.toLowerCase()
+        );
+        if (driver) {
+          state.truckDrivers[`${dayKey}-${parts[2]}`] = driver.id;
+        }
+      }
+    }
+
+  } catch (e) {
+    console.warn('loadDispatchConfig failed:', e);
+  }
+}
+
+async function writeDispatchConfig(type, dayKey, truck, value) {
+  if (!state.dispatchConfigCardId) {
+    console.warn('No DISPATCH CONFIG card ID — cannot write');
+    return;
+  }
+
+  const dateStr = dayKeyToDateStr(dayKey);
+  if (!dateStr) return;
+
+  const configKey = `${dateStr}-${truck}-${type}`;
+
+  // Read current description
+  const card = await trello(`/cards/${state.dispatchConfigCardId}?fields=desc`);
+  const lines = (card.desc || '').split('\n').filter(l => l.trim());
+
+  // Get 10-day window for stale cleanup
+  const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+  const windowDates = new Set(allDays.map(d => d.date.toISOString().slice(0, 10)));
+
+  // Filter: remove stale entries + remove existing entry for this key
+  const filtered = lines.filter(line => {
+    const dateMatch = line.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (!dateMatch) return false;
+    if (!windowDates.has(dateMatch[1])) return false; // stale — outside 10-day window
+    if (line.startsWith(configKey + ':')) return false; // replacing this entry
+    return true;
+  });
+
+  // Add new entry (null/empty = remove, don't add)
+  if (value !== null && value !== '' && value !== undefined) {
+    filtered.push(`${configKey}: ${value}`);
+  }
+
+  // Sort for readability
+  filtered.sort();
+
+  // Write back — one atomic PUT
+  const newDesc = filtered.join('\n');
+  await trello(`/cards/${state.dispatchConfigCardId}`, 'PUT', { desc: newDesc });
+}
+
+// ════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════
 let state = {
@@ -2149,7 +2335,7 @@ let state = {
   pendingSuggestion: null,
   expandedCard: null,
   popoverTarget: null,  // { type: 'queue'|'stop', id, dayKey?, truck?, index?, el? }
-  lockedTrucks: {},      // { 'MON-W1-A': true }
+  lockedTrucks: {},      // { 'MON-W1-A': true } — populated from DISPATCH CONFIG card
   showTruckB: false,     // hidden by default — Truck A only at start
   viewMode: 'manager',   // 'manager' | 'salesperson' — controls permissions and UI visibility
   loginRole: null,        // S29: actual role from login ('admin'|'manager'|'salesperson') — controls toggle visibility
@@ -2157,9 +2343,13 @@ let state = {
   mapMarkers: {},
   mapRouteLines: {},
   unscheduledMarkers: [],
-  truckDrivers: {},      // { 'MON-W1-A': driverId, 'MON-W1-B': driverId } — manager-assigned per day
+  truckDrivers: {},      // { 'MON-W1-A': driverId } — populated from DISPATCH CONFIG card
   staffMap: {},           // S31: { trelloMemberId: { name, trelloPK, trelloSO, trelloShipper, slackId } }
   searchPin: null,        // S32: Leaflet marker for address lookup pin (📍)
+  currentUser: '',        // S37: logged-in user's display name (for stagedBy in STATUS)
+  dispatchConfig: { drivers: {}, locks: {} }, // S37: parsed from DISPATCH CONFIG card
+  dispatchConfigCardId: null, // S37: Trello card ID for DISPATCH CONFIG (found by name)
+  customFields: [],       // S37: board custom field definitions (loaded dynamically)
 };
 
 // ════════════════════════════════════════════════════════
@@ -2475,21 +2665,12 @@ function recommendMultiple(card, limit = 5) {
       // Empty route = guaranteed green — no roadblocks
       if (stops.length === 0) colorScore = -10;
 
-      // Rider bonus: if card is flagged as rider and truck has stops, 
-      // give a big bonus when the card is close to an existing stop (in-route match)
-      let isInRouteMatch = false;
-      if (card.rider && stops.length > 0 && minDist < 5) {
-        score -= 200; // Strong bonus for nearby route match
-        isInRouteMatch = true;
-      }
-
       const insertPos = bestInsertPosition(stops, card.coords);
 
       options.push({
         dayKey: key, day, date, truck, insertPos, minDist,
         overflow: stops.length >= MAX_STOPS,
         isPreferredDay: !!isPreferredDay,
-        isInRouteMatch,
         stopsOnTruck: stops.length,
         score,
         colorScore
@@ -2975,9 +3156,6 @@ function buildTagStrip(data, phase) {
   // ⚠️ special request — red pill
   if (flags.includes('⚠️')) tags.push(`<span class="qc-tag warn-tag">⚠</span>`);
 
-  // 🎁 free / rider
-  if (data.rider) tags.push(`<span class="qc-tag free-tag">🎁</span>`);
-
   return tags.join('');
 }
 
@@ -3085,7 +3263,6 @@ function buildQueueCard(card) {
       const color = algoColor(best.colorScore);
       const dayColor = getDayColor(best.dayKey.split('-')[0], best.dayKey);
       const prefLabel = best.isPreferredDay ? '<span style="font-size:9px;font-weight:700;margin-left:4px">★ REQUESTED</span>' : '';
-      const riderMatch = (card.rider && best.isInRouteMatch) ? '<span style="color:rgba(100,80,180,0.8);font-size:9px;font-weight:700;margin-left:4px">🏷 IN-ROUTE</span>' : '';
 
       algoStrip = `<div class="algo-strip" 
         onmouseenter="showRoutePreview('${card.id}','${best.dayKey}','${best.truck}',${best.insertPos})"
@@ -3093,7 +3270,7 @@ function buildQueueCard(card) {
         style="cursor:pointer;border-left:3px solid ${dayColor}">
         <span class="algo-icon">✦</span>
         <span style="color:${color};font-weight:700;font-size:11px;font-family:'Inter Tight',sans-serif">${dateStr}</span>
-        ${prefLabel}${riderMatch}
+        ${prefLabel}
       </div>`;
 
       if (recs.length > 1 && !recs[1].routesFull) {
@@ -3141,7 +3318,7 @@ function buildQueueCard(card) {
 // RENDER RIGHT PANEL
 // ════════════════════════════════════════════════════════
 function renderRightPanel() {
-  saveSchedule();
+  // S37: Render never writes. saveSchedule() removed. Writes happen only on explicit user actions.
   renderRouteSheet();
 }
 
@@ -3345,18 +3522,6 @@ function renderRouteSheet() {
 // ════════════════════════════════════════════════════════
 // INTERACTIONS
 // ════════════════════════════════════════════════════════
-function toggleRider(cardId) {
-  const card = state.queueCards.find(c => c.id === cardId);
-  if (!card) return;
-  card.rider = !card.rider;
-  saveRiderState();
-  renderQueue();
-  if (card.rider) {
-    showToast(`🏷 ${card.name.split(' ').slice(0,3).join(' ')}… flagged as rider — waiting for in-route match`, 'info');
-  } else {
-    showToast(`Rider flag removed`, 'info');
-  }
-}
 
 // ════════════════════════════════════════════════════════
 // CARD DETAIL POPOVER
@@ -3488,22 +3653,15 @@ function buildPopoverContent(data, type, dayKey, truck, stopIdx) {
     }
   }
 
-  // Rider toggle — queue only
-  if (isQueue) {
+  // S31: Reject button — queue only, manager only, inside detail view for intentional action
+  if (isQueue && state.viewMode === 'manager') {
     const card = state.queueCards.find(c => c.id === (data.id || data.cardId));
     if (card) {
       html += `<div class="popover-divider"></div>`;
-      html += `<div class="popover-rider-row">
-        <span style="font-size:10px;color:rgba(0,0,0,0.4)">Free delivery (ride-along)</span>
-        <span class="free-toggle ${card.rider ? 'active' : ''}" onclick="event.stopPropagation();toggleRider('${card.id}');hideCardPopover()">${card.rider ? '✓ FREE' : 'Mark free'}</span>
-      </div>`;
-      // S31: Reject button — manager only, inside detail view for intentional action
-      if (state.viewMode === 'manager') {
-        html += `<div class="popover-reject-row">
+      html += `<div class="popover-reject-row">
           <span style="font-size:10px;color:rgba(0,0,0,0.4)">Return to OPEN SO</span>
           <span class="popover-reject-btn" onclick="event.stopPropagation();rejectCard('${card.id}')">✕ Return</span>
         </div>`;
-      }
     }
   }
 
@@ -3722,6 +3880,10 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     renderRightPanel();
     renderMap();
 
+    // S37: Sync STATUS positions for both source and destination trucks
+    syncTruckPositions(fromDay, fromTruck).catch(e => console.warn('Position sync failed:', e));
+    syncTruckPositions(dayKey, truck).catch(e => console.warn('Position sync failed:', e));
+
     const toLabel = truck.replace('truck','Truck ').replace('a','A').replace('b','B').replace('c','C');
     showToast(`↔ Moved to ${toLabel}, Stop ${toPos + 1}`, 'info');
     return;
@@ -3799,7 +3961,6 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     pickUpMemoDetail: card.pickUpMemoDetail,
     deliveryNotes: card.deliveryNotes,
     flags: card.flags || [],
-    rider: card.rider,
     _colorScore: (() => { const r = recommend(card); return r ? r.colorScore : 15; })(),
     committed: false,
     stagedAt: Date.now(),
@@ -3819,6 +3980,10 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
   renderQueue();
   renderRightPanel();
   renderMap();
+
+  // S37: Write STATUS field to Trello + sync all positions in this truck
+  syncTruckPositions(dayKey, truck)
+    .catch(e => { console.warn('STATUS write failed:', e); showToast('⚠ Staging may not have saved — refresh to verify', 'warning'); });
 
   showToast(`📦 ${card.name.split(' ').slice(0,3).join(' ')}… → Route ${truck}, Stop ${insertPos + 1}`, 'info');
 }
@@ -3851,13 +4016,8 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
     // 1. Set due date
     await trello(`/cards/${stop.cardId}`, 'PUT', { due: dueDate.toISOString() });
 
-    // 2. Set OT custom field to true
-    const otField = state.customFields?.find(f => f.name === 'OT');
-    if (otField) {
-      await trello(`/cards/${stop.cardId}/customField/${otField.id}/item`, 'PUT', {
-        value: { checked: 'true' }
-      });
-    }
+    // 2. S37: Write STATUS=CM (replaces OT field)
+    await writeStatusField(stop.cardId, 'CM', dayKey, truck, stopIndex, stop.stagedBy || state.currentUser || '');
 
     // 3. Get card owner for @mention and shipper list routing
     let mentionTag = '';
@@ -4035,7 +4195,11 @@ function confirmAssign() {
   // Assign driver to truck for this day (if selected)
   if (driverId && dayKey) {
     state.truckDrivers[`${dayKey}-${truck}`] = driverId;
-    saveTruckDrivers();
+    // S37: Write to DISPATCH CONFIG
+    const driver = state.drivers.find(d => d.id === driverId);
+    const driverName = driver?.name?.split(' ')[0] || '';
+    writeDispatchConfig('DRIVER', dayKey, truck, driverName)
+      .catch(e => console.warn('Driver assignment write failed:', e));
   }
 
   const pos = stopPos === 'auto' ? bestInsertPosition(state.schedule[dayKey]?.[truck] || [], card.coords) : parseInt(stopPos);
@@ -4102,7 +4266,6 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
     pickUpMemoDetail: card.pickUpMemoDetail,
     deliveryNotes: card.deliveryNotes,
     flags: card.flags || [],
-    rider: card.rider,
     _colorScore: (() => { const r = recommend(card); return r ? r.colorScore : 15; })(),
     committed: false,
     stagedAt: Date.now(),
@@ -4127,6 +4290,10 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
   renderQueue();
   renderRightPanel();
   renderMap();
+
+  // S37: Sync STATUS positions for this truck
+  syncTruckPositions(dayKey, truck)
+    .catch(e => { console.warn('STATUS write failed:', e); showToast('⚠ Staging may not have saved — refresh to verify', 'warning'); });
 }
 
 function reoptimizeTruck(dayKey, truck) {
@@ -4163,12 +4330,17 @@ function removeStop(dayKey, truck, idx) {
 
   // Staged (uncommitted) — instant removal, no dialog
   if (!stop.committed) {
+    const cardId = stop.cardId || stop.id;
     state.schedule[dayKey][truck].splice(idx, 1);
     state.queueCards.unshift(stopToQueueCard(stop));
     renderQueue();
     renderRightPanel();
     renderMap();
     showToast(`↩ ${(stop.cardName || stop.name).split(' ').slice(0,3).join(' ')}… returned to queue`, 'info');
+
+    // S37: Clear STATUS + sync remaining positions
+    clearStatusField(cardId).catch(e => console.warn('STATUS clear failed:', e));
+    syncTruckPositions(dayKey, truck).catch(e => console.warn('Position sync failed:', e));
     return;
   }
 
@@ -4176,7 +4348,7 @@ function removeStop(dayKey, truck, idx) {
   showConfirm(
     '↩',
     'Un-commit from schedule?',
-    'This will undo the Trello changes (clear due date, OT field) and return the card to the queue.',
+    'This will undo the Trello changes (clear due date, STATUS) and return the card to the queue.',
     async () => {
       const cardId = stop.cardId || stop.id;
 
@@ -4200,12 +4372,13 @@ function removeStop(dayKey, truck, idx) {
         await trello(`/cards/${cardId}`, 'PUT', { due: '' });
       } catch(e) { console.warn('Uncommit: could not clear due date', e); }
 
+      // S37: Clear STATUS field (replaces OT clear)
       try {
-        const otField = state.customFields?.find(f => f.name === 'OT');
-        if (otField) {
-          await trello(`/cards/${cardId}/customField/${otField.id}/item`, 'PUT', { value: { checked: 'false' } });
-        }
-      } catch(e) { console.warn('Uncommit: could not clear OT field', e); }
+        await clearStatusField(cardId);
+      } catch(e) { console.warn('Uncommit: could not clear STATUS', e); }
+
+      // S37: Sync remaining positions in this truck
+      syncTruckPositions(dayKey, truck).catch(e => console.warn('Position sync failed:', e));
 
       try {
         // Fetch card owner's @username for Butler → Slack DM notification
@@ -4337,6 +4510,8 @@ function dropStop(e, dayKey, truck, toIdx) {
     renderRightPanel();
     renderMap();
     showToast('Stop order updated', 'info');
+    // S37: Sync all positions in this truck
+    syncTruckPositions(dayKey, truck).catch(e => console.warn('Position sync failed:', e));
     return;
   }
 
@@ -4374,8 +4549,12 @@ function dropStop(e, dayKey, truck, toIdx) {
   if (moved.committed) {
     showToast(`↔ Committed stop moved to Route ${truck} — Trello comment unchanged`, 'info');
   } else {
-    showToast(`↔ Moved to ${toLabel}, Stop ${toIdx + 1}`, 'info');
+    showToast(`↔ Moved to Route ${truck}, Stop ${toIdx + 1}`, 'info');
   }
+
+  // S37: Sync positions for both source and destination trucks
+  syncTruckPositions(fromDay, fromTruck).catch(e => console.warn('Position sync failed:', e));
+  syncTruckPositions(dayKey, truck).catch(e => console.warn('Position sync failed:', e));
 }
 
 // ── DRAG STOP BACK TO QUEUE (UN-SCHEDULE) ──
@@ -4416,7 +4595,7 @@ function handleQueueDrop(e) {
   // Remove from schedule
   stops.splice(idx, 1);
 
-  // Rebuild as queue card using standardized helper (Bug 6 fix — was missing rider)
+  // Rebuild as queue card using standardized helper
   const queueCard = stopToQueueCard(stop);
   state.queueCards.push(queueCard);
 
@@ -4425,6 +4604,11 @@ function handleQueueDrop(e) {
   renderRightPanel();
   renderMap();
   showToast(`↩ ${(stop.cardName || stop.name).split(' ').slice(0,3).join(' ')}… returned to queue`, 'info');
+
+  // S37: Clear STATUS + sync remaining positions
+  const cardId = stop.cardId || stop.id;
+  clearStatusField(cardId).catch(e => console.warn('STATUS clear failed:', e));
+  syncTruckPositions(dayKey, truck).catch(e => console.warn('Position sync failed:', e));
 }
 
 function toggleTruckB() {
@@ -4445,12 +4629,11 @@ function toggleTruckLock(truckKey, dayKey, truck) {
   const isCurrentlyLocked = state.lockedTrucks[truckKey];
 
   if (isCurrentlyLocked) {
-    // UNLOCK — simple
-    state.lockedTrucks[truckKey] = false;
-    saveLockState();
-    renderRightPanel();
-    renderMap();
-    showToast('🔓 Route unlocked — available for scheduling', 'info');
+    // UNLOCK — write to DISPATCH CONFIG + force refresh
+    showToast('🔓 Unlocking route…', 'info');
+    writeDispatchConfig('LOCK', dayKey, truck, null)
+      .then(() => location.reload())
+      .catch(e => { console.warn('Unlock failed:', e); showToast('⚠ Unlock failed — try again', 'error'); });
     return;
   }
 
@@ -4458,19 +4641,17 @@ function toggleTruckLock(truckKey, dayKey, truck) {
   const stops = state.schedule[dayKey]?.[truck] || [];
 
   if (stops.length === 0) {
-    // Empty truck — lock immediately
-    state.lockedTrucks[truckKey] = true;
-    saveLockState();
-    renderRightPanel();
-    renderMap();
-    showToast('🔒 Route locked — unavailable', 'info');
+    // Empty truck — lock immediately via DISPATCH CONFIG + force refresh
+    showToast('🔒 Locking route…', 'info');
+    writeDispatchConfig('LOCK', dayKey, truck, 'true')
+      .then(() => location.reload())
+      .catch(e => { console.warn('Lock failed:', e); showToast('⚠ Lock failed — try again', 'error'); });
     return;
   }
 
   // Truck has stops — confirm dialog
   const committedCount = stops.filter(s => s.committed).length;
   const stagedCount = stops.filter(s => !s.committed).length;
-  const totalCount = stops.length;
   const msg = committedCount > 0 && stagedCount > 0
     ? `${stagedCount} staged stop${stagedCount > 1 ? 's' : ''} will return to Pending. ${committedCount} committed stop${committedCount > 1 ? 's' : ''} will remain (already in Trello).`
     : committedCount > 0
@@ -4482,44 +4663,24 @@ function toggleTruckLock(truckKey, dayKey, truck) {
     `Lock Route ${truck}?`,
     msg,
     async () => {
-      const stopsToProcess = [...stops];
+      showToast('🔒 Locking route…', 'info');
 
-      // Only bounce STAGED stops — committed stay (already written to Trello)
-      const staged = stopsToProcess.filter(s => !s.committed);
-      for (const stop of staged) {
-        state.queueCards.push(stopToQueueCard(stop));
+      // S37: Clear STATUS for staged stops before locking
+      const staged = stops.filter(s => !s.committed);
+      try {
+        await Promise.all(staged.map(s => clearStatusField(s.cardId || s.id)));
+      } catch(e) { console.warn('Lock: STATUS clear failed for some stops', e); }
+
+      // Write lock to DISPATCH CONFIG + force refresh
+      try {
+        await writeDispatchConfig('LOCK', dayKey, truck, 'true');
+        location.reload();
+      } catch(e) {
+        console.warn('Lock failed:', e);
+        showToast('⚠ Lock failed — try again', 'error');
       }
-      // Keep committed stops in schedule; remove staged
-      state.schedule[dayKey][truck] = stopsToProcess.filter(s => s.committed);
-
-      // Lock the truck
-      state.lockedTrucks[truckKey] = true;
-      saveLockState();
-      saveSchedule();
-
-      renderQueue();
-      renderRightPanel();
-      renderMap();
-
-      showToast(`🔒 Route ${truck} locked${staged.length > 0 ? ` — ${staged.length} staged stop${staged.length > 1 ? 's' : ''} returned to Pending` : ''}`, 'info');
     }
   );
-}
-
-// ── LOCK STATE PERSISTENCE ──
-function saveLockState() {
-  try {
-    localStorage.setItem('cf-dispatch-locks', JSON.stringify(state.lockedTrucks));
-  } catch(e) { /* localStorage unavailable */ }
-}
-
-function loadLockState() {
-  try {
-    const saved = localStorage.getItem('cf-dispatch-locks');
-    if (saved) {
-      state.lockedTrucks = JSON.parse(saved);
-    }
-  } catch(e) { /* localStorage unavailable */ }
 }
 
 // ── QUEUE SORT HELPER ──
@@ -4624,6 +4785,9 @@ function assignDriverToTruck(dayKey, truck, driverId) {
   if (driverId === null || driverId === 'null') {
     delete state.truckDrivers[truckKey];
     showToast(`Route ${truck} driver removed`, 'info');
+    // S37: Remove from DISPATCH CONFIG
+    writeDispatchConfig('DRIVER', dayKey, truck, null)
+      .catch(e => { console.warn('Driver removal write failed:', e); showToast('⚠ Driver removal may not have saved', 'warning'); });
   } else {
     // Check if driver is unavailable — warn but still allow
     const driver = state.drivers.find(d => d.id === driverId);
@@ -4634,6 +4798,8 @@ function assignDriverToTruck(dayKey, truck, driverId) {
       if (t === truck) continue;
       if (state.truckDrivers[`${dayKey}-${t}`] === driverId) {
         delete state.truckDrivers[`${dayKey}-${t}`];
+        // S37: Remove old assignment from DISPATCH CONFIG
+        writeDispatchConfig('DRIVER', dayKey, t, null).catch(e => console.warn('Swap driver removal failed:', e));
       }
     }
 
@@ -4645,43 +4811,20 @@ function assignDriverToTruck(dayKey, truck, driverId) {
     } else {
       showToast(`${name} → Route ${truck}`, 'success');
     }
+
+    // S37: Write to DISPATCH CONFIG (optimistic — local state already updated)
+    writeDispatchConfig('DRIVER', dayKey, truck, name)
+      .catch(e => { console.warn('Driver assignment write failed:', e); showToast('⚠ Driver assignment may not have saved', 'warning'); });
   }
 
-  saveTruckDrivers();
   closeDriverPicker();
   renderRightPanel();
   renderMap();
 }
 
 // ════════════════════════════════════════════════════════
-// COMMIT TO TRELLO
-// ════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════
 // DATA LOADING
 // ════════════════════════════════════════════════════════
-// ── RIDER PERSISTENCE ──
-function saveRiderState() {
-  const riderIds = state.queueCards.filter(c => c.rider).map(c => c.id);
-  try { localStorage.setItem('cf_dispatch_riders', JSON.stringify(riderIds)); } catch(e) {}
-}
-function loadRiderState() {
-  try { return new Set(JSON.parse(localStorage.getItem('cf_dispatch_riders') || '[]')); } catch(e) { return new Set(); }
-}
-function applyRiderState(cards) {
-  const riderIds = loadRiderState();
-  cards.forEach(c => { if (riderIds.has(c.id)) c.rider = true; });
-}
-
-// ── SCHEDULE PERSISTENCE ──
-function saveSchedule() {
-  try { localStorage.setItem('cf_dispatch_schedule', JSON.stringify(state.schedule)); } catch(e) {}
-}
-function loadSchedule() {
-  try {
-    const saved = localStorage.getItem('cf_dispatch_schedule');
-    if (saved) state.schedule = JSON.parse(saved);
-  } catch(e) {}
-}
 
 let _loadDataInFlight = false;
 
@@ -4700,6 +4843,9 @@ async function loadData() {
     // Load drivers from hidden board
     await loadDrivers();
 
+    // S37: Load DISPATCH CONFIG card (locks + driver assignments)
+    await loadDispatchConfig();
+
     // Load all board lists to find "RFS" (RFS lives on main board to preserve card members)
     const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
     let rfsListId = lists.find(l => l.name === 'RFS')?.id;
@@ -4711,32 +4857,150 @@ async function loadData() {
       showToast('"RFS" list created', 'info');
     }
 
-    // Load cards from that list
+    // Load cards from RFS list (with customFieldItems for STATUS)
     const cards = await trello(`/lists/${rfsListId}/cards?customFieldItems=true&attachments=false&fields=id,name,shortLink,desc,due,dueStart,coordinates,address,locationName&pluginData=true&members=true&member_fields=fullName,avatarUrl,username`);
 
     // Geocode addresses
     const processed = [];
     for (const card of cards) {
       const processed_card = await processCard(card);
+      // S37: Extract STATUS custom field for schedule reconstruction
+      const statusField = (card.customFieldItems || []).find(f => f.idCustomField === getFieldId('STATUS'));
+      processed_card._statusRaw = statusField?.value?.text || '';
+      processed_card._status = decodeStatus(processed_card._statusRaw);
       processed.push(processed_card);
     }
 
-    // Restore rider (free) flags from localStorage before filtering/rendering
-    applyRiderState(processed);
+    // S37: Build schedule from STATUS field — replaces localStorage schedule
+    state.schedule = {};
+    state.queueCards = [];
 
-    // Remove cards already in the schedule (staged or committed)
-    const scheduledCardIds = new Set();
-    for (const dayKey of Object.keys(state.schedule)) {
-      for (const truck of Object.keys(state.schedule[dayKey])) {
-        for (const stop of state.schedule[dayKey][truck]) {
-          if (stop.cardId) scheduledCardIds.add(stop.cardId);
-        }
+    for (const card of processed) {
+      const status = card._status;
+      // STATUS=ST + card is in RFS → staged
+      if (status && status.state === 'ST') {
+        const dayKey = dateToDayKey(status.date);
+        if (!dayKey) { state.queueCards.push(card); continue; } // date outside 10-day window → pending
+
+        if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
+        if (!state.schedule[dayKey][status.truck]) state.schedule[dayKey][status.truck] = [];
+
+        state.schedule[dayKey][status.truck].push({
+          id: card.id,
+          cardId: card.id,
+          shortLink: card.shortLink,
+          name: card.name,
+          cardName: card.name,
+          address: card.address,
+          coords: card.coords,
+          quadrant: card.quadrant,
+          invTotal: card.invTotal,
+          customerName: card.customerName,
+          customerPhone: card.customerPhone,
+          requesterName: card.requesterName,
+          requesterAvatar: card.requesterAvatar,
+          rsValue: card.rsValue,
+          firstStopRequested: card.firstStopRequested,
+          lastStopRequested: card.lastStopRequested,
+          dropoff: card.dropoff,
+          deliveryMemo: card.deliveryMemo,
+          deliveryMemoDetail: card.deliveryMemoDetail,
+          pickUpMemo: card.pickUpMemo,
+          pickUpMemoDetail: card.pickUpMemoDetail,
+          deliveryNotes: card.deliveryNotes,
+          flags: card.flags || [],
+          _colorScore: (() => { const r = recommend(card); return r ? r.colorScore : 15; })(),
+          committed: false,
+          stagedAt: null,
+          stagedBy: status.stagedBy || '',
+          queuedAt: card.queuedAt || null,
+          _stopPosition: status.stop,
+        });
+      } else {
+        // No STATUS or invalid → pending queue
+        state.queueCards.push(card);
       }
     }
-    state.queueCards = processed.filter(c => !scheduledCardIds.has(c.id));
 
-    // Load already-scheduled cards (OT = true) for map display
-    await loadScheduledCards();
+    // Sort staged stops by position within each truck
+    for (const dayKey of Object.keys(state.schedule)) {
+      for (const truck of Object.keys(state.schedule[dayKey])) {
+        state.schedule[dayKey][truck].sort((a, b) => (a._stopPosition || 0) - (b._stopPosition || 0));
+      }
+    }
+
+    // S37: Load committed cards from SHIPPER lists (STATUS=CM)
+    // Spec: collect all SHIPPER list IDs from staffMap, validate card's list against that Set
+    // staffMap.trelloShipper stores list names (e.g. "SHIPPER Jeff") — resolve to IDs
+    const staffShipperNames = new Set();
+    for (const entry of Object.values(state.staffMap)) {
+      if (entry.trelloShipper) {
+        // trelloShipper can be comma-separated — take all values
+        entry.trelloShipper.split(',').forEach(n => staffShipperNames.add(n.trim()));
+      }
+    }
+    const shipperLists = lists.filter(l => staffShipperNames.has(l.name));
+
+    for (const list of shipperLists) {
+      try {
+        const shipperCards = await trello(`/lists/${list.id}/cards?customFieldItems=true&fields=id,name,shortLink,due,coordinates,address,locationName&pluginData=true&members=true&member_fields=fullName,avatarUrl,username`);
+        for (const card of shipperCards) {
+          // Decode STATUS
+          const statusField = (card.customFieldItems || []).find(f => f.idCustomField === getFieldId('STATUS'));
+          const statusValue = statusField?.value?.text || '';
+          const status = decodeStatus(statusValue);
+
+          // Only include cards with valid CM STATUS
+          if (!status || status.state !== 'CM') continue;
+
+          const dayKey = dateToDayKey(status.date);
+          if (!dayKey) continue; // date outside 10-day window
+
+          const processedCard = await processCard(card);
+          if (!processedCard.coords) continue;
+
+          if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
+          if (!state.schedule[dayKey][status.truck]) state.schedule[dayKey][status.truck] = [];
+
+          state.schedule[dayKey][status.truck].push({
+            id: processedCard.id,
+            cardId: processedCard.id,
+            shortLink: processedCard.shortLink,
+            name: processedCard.name,
+            cardName: processedCard.name,
+            address: processedCard.address,
+            coords: processedCard.coords,
+            quadrant: processedCard.quadrant,
+            invTotal: processedCard.invTotal,
+            customerName: processedCard.customerName,
+            customerPhone: processedCard.customerPhone,
+            requesterName: processedCard.requesterName,
+            requesterAvatar: processedCard.requesterAvatar,
+            rsValue: processedCard.rsValue,
+            firstStopRequested: processedCard.firstStopRequested,
+            lastStopRequested: processedCard.lastStopRequested,
+            dropoff: processedCard.dropoff,
+            deliveryMemo: processedCard.deliveryMemo,
+            deliveryMemoDetail: processedCard.deliveryMemoDetail,
+            pickUpMemo: processedCard.pickUpMemo,
+            pickUpMemoDetail: processedCard.pickUpMemoDetail,
+            deliveryNotes: processedCard.deliveryNotes,
+            flags: processedCard.flags || [],
+            committed: true,
+            stagedBy: status.stagedBy || '',
+            queuedAt: null,
+            _stopPosition: status.stop,
+          });
+        }
+      } catch (e) { console.warn('loadData: SHIPPER list fetch failed', e); }
+    }
+
+    // Sort committed stops by position too
+    for (const dayKey of Object.keys(state.schedule)) {
+      for (const truck of Object.keys(state.schedule[dayKey])) {
+        state.schedule[dayKey][truck].sort((a, b) => (a._stopPosition || 0) - (b._stopPosition || 0));
+      }
+    }
 
     setSyncStatus('ok', `Synced · ${new Date().toLocaleTimeString()}`);
     renderQueue();
@@ -4839,15 +5103,7 @@ async function loadDrivers() {
       };
     });
 
-  // Restore saved driver assignments from localStorage
-  try {
-    const saved = JSON.parse(localStorage.getItem('cf_dispatch_truck_drivers') || '{}');
-    state.truckDrivers = saved;
-  } catch { state.truckDrivers = {}; }
-}
-
-function saveTruckDrivers() {
-  localStorage.setItem('cf_dispatch_truck_drivers', JSON.stringify(state.truckDrivers));
+  // S37: Truck driver assignments now loaded from DISPATCH CONFIG card in loadDispatchConfig()
 }
 
 function getDriverForTruck(dayKey, truck) {
@@ -4982,42 +5238,6 @@ function parseShippingPluginData(pluginData) {
   }
 
   return empty;
-}
-
-async function loadScheduledCards() {
-  // Load all SHIPPER lists and find OT=true cards for map
-  const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
-  const shipperLists = lists.filter(l => l.name.startsWith('SHIPPER'));
-
-  for (const list of shipperLists) {
-    try {
-      const cards = await trello(`/lists/${list.id}/cards?customFieldItems=true&fields=id,name,shortLink,due`);
-      for (const card of cards) {
-        const otField = card.customFieldItems?.find(f => f.idCustomField === getFieldId('OT'));
-        if (otField?.value?.checked === 'true' && card.due) {
-          // Add to schedule display
-          const dueDate = new Date(card.due);
-          const day = DAYS[dueDate.getDay() - 1];
-          if (!day) continue;
-
-          const processed = await processCard(card);
-          if (!processed.coords) continue;
-
-          // Determine week
-          const week1 = getWeekDates(0);
-          const week2 = getWeekDates(1);
-          const w1Match = week1.find(d => d.date.toDateString() === dueDate.toDateString());
-          const w2Match = week2.find(d => d.date.toDateString() === dueDate.toDateString());
-          const dayKey = w1Match?.key || w2Match?.key;
-          if (!dayKey) continue;
-
-          if (!state.schedule[dayKey]) state.schedule[dayKey] = {};
-          if (!state.schedule[dayKey].A) state.schedule[dayKey].A = [];
-          state.schedule[dayKey].A.push({ ...processed, pendingCommit: false });
-        }
-      }
-    } catch {}
-  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -5273,10 +5493,10 @@ async function performLogin() {
     // Close login overlay and initialize app (first login — DOMContentLoaded skipped init)
     document.getElementById('login-overlay').style.display = 'none';
     state.viewMode = effectiveViewMode;
+    state.currentUser = fullName; // S37: for STATUS stagedBy
 
     initMap();
-    loadLockState();
-    loadSchedule();
+    // S37: loadLockState/loadSchedule removed — state loaded from Trello in loadData()
 
     const week1 = getWeekDates(0);
     state.activeRightDay = week1[0].key;
@@ -5457,10 +5677,15 @@ document.addEventListener('DOMContentLoaded', () => {
     state.loginRole = savedLoginRole;
   }
 
+  // S37: Restore currentUser for STATUS stagedBy
+  try {
+    const savedUser = JSON.parse(localStorage.getItem('cf_dispatch_user'));
+    state.currentUser = savedUser?.fullName || '';
+  } catch { state.currentUser = ''; }
+
   // Initialize app (session validated implicitly on first Worker proxy call)
   initMap();
-  loadLockState();
-  loadSchedule();
+  // S37: loadLockState/loadSchedule removed — state loaded from Trello in loadData()
 
   const week1 = getWeekDates(0);
   state.activeRightDay = week1[0].key;
