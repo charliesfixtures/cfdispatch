@@ -3636,6 +3636,7 @@ function renderRouteSheet() {
         html += `<div class="stop-item ${isStaged ? 'staged' : ''} ${isCommitted ? 'committed' : ''}" draggable="${isDraggable}"
           style="--day-color:${stopDayColor}"
           onclick="showCardPopover('stop','${stop.cardId || stop.id}',this,'${key}','${truck}',${i})"
+          ondblclick="window.open('https://trello.com/c/${stop.shortLink}','_blank')"
           ondragstart="dragStop(event,'${key}','${truck}',${i})"
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
