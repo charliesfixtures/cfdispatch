@@ -3527,17 +3527,17 @@ function renderRouteSheet() {
         ${avatarHTML}
         <div class="truck-info">
           <div class="truck-name">${driverName || '<span style="color:rgba(0,0,0,0.25);font-style:italic">No driver</span>'}</div>
-          <div class="truck-label">Route ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">Unavailable</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
+          <div class="truck-label">Route ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">LOCKED</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
-        ${state.viewMode === 'manager' ? `<button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck (unavailable)'}">
+        ${state.viewMode === 'manager' ? `<button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck'}">
           ${isLocked ? '🔒' : '🔓'}
         </button>` : ''}
       </div>`;
 
     if (stops.length === 0) {
       html += `<div class="stops-list">
-        <div class="truck-empty">${isLocked ? 'Truck unavailable — unlock to open' : 'No stops — drag a card here or use Schedule'}</div>
+        <div class="truck-empty">${isLocked ? 'Truck LOCKED — unlock to open' : 'No stops — drag a card here or use Schedule'}</div>
       </div>`;
     } else {
       html += `<div class="stops-list">
@@ -3614,10 +3614,12 @@ function renderRouteSheet() {
   // Restore truck B/C toggle button visibility
   const btnB = document.getElementById('truck-b-btn');
   const btnC = document.getElementById('truck-c-btn');
-  if (state.showTruckB) {
+  const truckBVisible = state.showTruckB || (state.schedule[key]?.B || []).length > 0 || state.lockedTrucks[`${key}-B`];
+  const truckCVisible = state.showTruckC || (state.schedule[key]?.C || []).length > 0 || state.lockedTrucks[`${key}-C`];
+  if (truckBVisible) {
     if (btnB) btnB.style.display = 'none';
     if (btnC) btnC.style.display = 'block';
-    if (btnC) btnC.textContent = state.showTruckC ? '− Remove Route C' : '+ Add Route C';
+    if (btnC) btnC.textContent = truckCVisible ? '− Remove Route C' : '+ Add Route C';
   } else {
     if (btnB) btnB.style.display = 'block';
     if (btnC) btnC.style.display = 'none';
@@ -5473,11 +5475,13 @@ function updateViewModeToggle() {
     sp.style.cursor = 'default';
   }
   
-  // Truck C — manager and admin only. Only show if manager/admin AND Truck B is already added.
+  // Truck C — manager and admin only. Only show if manager/admin AND Truck B is already visible.
   const truckCBtn = document.getElementById('truck-c-btn');
   const truckBBtn = document.getElementById('truck-b-btn');
-  if (truckCBtn) truckCBtn.style.display = (currentIsManager && state.showTruckB) ? 'inline-flex' : 'none';
-  if (truckBBtn) truckBBtn.style.display = state.showTruckB ? 'none' : 'inline-flex';
+  const activeKey = state.activeRightDay;
+  const truckBShown = state.showTruckB || (activeKey && (state.schedule[activeKey]?.B || []).length > 0) || (activeKey && state.lockedTrucks[`${activeKey}-B`]);
+  if (truckCBtn) truckCBtn.style.display = (currentIsManager && truckBShown) ? 'inline-flex' : 'none';
+  if (truckBBtn) truckBBtn.style.display = truckBShown ? 'none' : 'inline-flex';
 }
 
 
