@@ -2224,12 +2224,34 @@ function stopToQueueCard(stop) {
 // Check if a route can accept another stop (overflow = nearby allowed)
 // Returns { allowed: bool, overflow: bool }
 function checkOverflowAllowed(stops, cardCoords) {
-  if (!stops || stops.length < MAX_STOPS) return { allowed: true, overflow: false };
+  const { physicalCount } = getPhysicalStops(stops);
+  if (!stops || physicalCount < MAX_STOPS) return { allowed: true, overflow: false };
   if (!cardCoords) return { allowed: false, overflow: true };
   const minDist = stops.reduce((min, s) =>
     s.coords ? Math.min(min, distanceMiles(cardCoords, s.coords)) : min, Infinity);
   if (minDist > OVERFLOW_RADIUS_MILES) return { allowed: false, overflow: true };
   return { allowed: true, overflow: true };
+}
+
+// S46/P26: Same-address stop consolidation
+// Consecutive stops with identical Trello address = one physical stop.
+// Non-consecutive same address = separate physical stops.
+// Null/empty address = always its own physical stop.
+function getPhysicalStops(stops) {
+  if (!stops || !stops.length) return { physicalCount: 0, physicalNums: [] };
+  let count = 1;
+  const nums = [1];
+  for (let i = 1; i < stops.length; i++) {
+    const prev = stops[i - 1].address;
+    const curr = stops[i].address;
+    if (curr && prev && curr === prev) {
+      nums.push(count); // same physical stop as previous
+    } else {
+      count++;
+      nums.push(count);
+    }
+  }
+  return { physicalCount: count, physicalNums: nums };
 }
 
 // Single lock check — kills dead state[`lock-...`] pattern
@@ -2722,7 +2744,8 @@ function recommendMultiple(card, limit = 5) {
       if (state.lockedTrucks[truckKey]) continue;
 
       const stops = state.schedule[key]?.[truck] || [];
-      if (stops.length >= MAX_STOPS) {
+      const { physicalCount: pc } = getPhysicalStops(stops);
+      if (pc >= MAX_STOPS) {
         const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
         if (minDist > OVERFLOW_RADIUS_MILES) continue;
       }
@@ -2767,13 +2790,13 @@ function recommendMultiple(card, limit = 5) {
       }
 
       // Capacity bonus: emptier routes score better (higher chance of approval)
-      const capacityBonus = (MAX_STOPS - stops.length) * 2;
+      const capacityBonus = (MAX_STOPS - pc) * 2;
       score -= capacityBonus;
       colorScore -= capacityBonus;
 
       // Overflow penalty: full truck must never beat an empty/partial truck on the same day.
       // Without this, a nearby full Truck A (minDist ~0.3) beats an empty Truck B (~2.0).
-      if (stops.length >= MAX_STOPS) score += 25;
+      if (pc >= MAX_STOPS) score += 25;
 
       // Empty route = guaranteed green — no roadblocks
       if (stops.length === 0) colorScore = -10;
@@ -2782,9 +2805,9 @@ function recommendMultiple(card, limit = 5) {
 
       options.push({
         dayKey: key, day, date, truck, insertPos, minDist,
-        overflow: stops.length >= MAX_STOPS,
+        overflow: pc >= MAX_STOPS,
         isPreferredDay: !!isPreferredDay,
-        stopsOnTruck: stops.length,
+        stopsOnTruck: pc,
         score,
         colorScore
       });
@@ -2983,15 +3006,16 @@ function renderMap() {
       state.mapRouteLines[key].push(line);
 
       // Stop pins — circle for Truck A, diamond for Truck B, rounded square for Truck C
+      const { physicalNums: pinNums } = getPhysicalStops(stops);
       stops.forEach((stop, i) => {
         if (!stop.coords) return;
         let pinHtml;
         if (truck === 'B') {
           // Diamond: rotated square, number counter-rotated to read straight
-          pinHtml = `<div style="background:${dayColor};width:20px;height:20px;border-radius:3px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)"><span style="transform:rotate(-45deg)">${i+1}</span></div>`;
+          pinHtml = `<div style="background:${dayColor};width:20px;height:20px;border-radius:3px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)"><span style="transform:rotate(-45deg)">${pinNums[i]}</span></div>`;
         } else {
           const radius = truck === 'A' ? '50%' : '6px';
-          pinHtml = `<div style="background:${dayColor};width:24px;height:24px;border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)">${i+1}</div>`;
+          pinHtml = `<div style="background:${dayColor};width:24px;height:24px;border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)">${pinNums[i]}</div>`;
         }
         const icon = L.divIcon({
           className: '',
@@ -3503,6 +3527,7 @@ function renderRouteSheet() {
     const truckKey = `${key}-${truck}`;
     const stops = state.schedule[key]?.[truck] || [];
     const isLocked = state.lockedTrucks[truckKey];
+    const { physicalCount: pc, physicalNums: pNums } = getPhysicalStops(stops);
 
     // Get manager-assigned driver for this day+truck
     const driver = getDriverForTruck(key, truck);
@@ -3512,7 +3537,7 @@ function renderRouteSheet() {
     const isUnavailable = driverStatus && !driverStatus.available;
 
     const capDots = Array.from({length: MAX_STOPS}, (_, i) =>
-      `<div class="cap-dot ${i < stops.length ? (stops.length > MAX_STOPS ? 'overflow' : 'filled') : ''}"></div>`
+      `<div class="cap-dot ${i < pc ? (pc > MAX_STOPS ? 'overflow' : 'filled') : ''}"></div>`
     ).join('');
 
     // Build glass tooltip HTML from driver info
@@ -3554,7 +3579,7 @@ function renderRouteSheet() {
         ${avatarHTML}
         <div class="truck-info">
           <div class="truck-name">${driverName || '<span style="color:rgba(0,0,0,0.25);font-style:italic">No driver</span>'}</div>
-          <div class="truck-label">Route ${truck} · ${stops.length}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">LOCKED</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
+          <div class="truck-label">Route ${truck} · ${pc}/${MAX_STOPS}${isLocked ? ' · <span style="color:var(--danger)">LOCKED</span>' : ''}${isUnavailable && !isLocked ? ` · <span style="color:var(--danger)">${driverStatus.label}</span>` : ''}</div>
         </div>
         <div class="capacity-dots">${capDots}</div>
         ${state.viewMode === 'manager' ? `<button class="truck-lock-btn ${isLocked ? 'locked' : ''}" onclick="toggleTruckLock('${truckKey}','${key}','${truck}')" title="${isLocked ? 'Unlock truck' : 'Lock truck'}">
@@ -3582,12 +3607,12 @@ function renderRouteSheet() {
             ? `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor};pointer-events:none">
                 ${crownHtml}
                 <img src="${stop.requesterAvatar}" onerror="this.style.background='#ddd'" />
-                <div class="committed-stop-badge">${i+1}</div>
+                <div class="committed-stop-badge">${pNums[i]}</div>
               </div>`
             : `<div class="committed-pfp-wrap" title="Drag to reorder" style="--day-color:${stopDayColor};pointer-events:none">
                 ${crownHtml}
                 <div class="committed-pfp-fallback">✓</div>
-                <div class="committed-stop-badge">${i+1}</div>
+                <div class="committed-stop-badge">${pNums[i]}</div>
               </div>`)
           : '';
 
@@ -3615,7 +3640,7 @@ function renderRouteSheet() {
           ondragover="event.preventDefault();this.style.background='rgba(240,201,58,0.06)'"
           ondragleave="this.style.background=''"
           ondrop="dropStop(event,'${key}','${truck}',${i});this.style.background=''">
-          ${isCommitted ? committedPfpHtml : `<div class="stop-num" title="Drag to reorder">⠿ ${i+1}</div>`}
+          ${isCommitted ? committedPfpHtml : `<div class="stop-num" title="Drag to reorder">⠿ ${pNums[i]}</div>`}
           <div class="stop-content">
             <div class="stop-name">${stop.cardName || stop.name}</div>
             ${stopAddress ? `<div style="font-size:10px;color:rgba(0,0,0,0.32);margin-top:1px">${stopAddress}</div>` : ''}
@@ -3913,7 +3938,8 @@ function handleTruckDragOver(e, dayKey, truck) {
     if (dragData.dayKey === dayKey && dragData.truck === truck) return;
     // Visual warning for full truck (but still allow drop for overflow)
     const stops = state.schedule[dayKey]?.[truck] || [];
-    if (stops.length >= MAX_STOPS) {
+    const { physicalCount: pc } = getPhysicalStops(stops);
+    if (pc >= MAX_STOPS) {
       section.classList.add('drop-hover');
       section.style.opacity = '0.7'; // dimmed to indicate overflow
       return;
@@ -3991,15 +4017,16 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     // Check overflow — same logic as queue→route (managers bypass distance gate)
     const movedStop = fromStops[fromIdx];
     const ofCheck = checkOverflowAllowed(toStops, movedStop?.coords);
-    if (toStops.length >= MAX_STOPS) {
+    const { physicalCount: toPC } = getPhysicalStops(toStops);
+    if (toPC >= MAX_STOPS) {
       if (state.viewMode === 'manager') {
-        showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — manager override`, 'warning');
+        showToast(`⚠ Over capacity (${toPC + 1}/${MAX_STOPS}) — manager override`, 'warning');
       } else if (!ofCheck.allowed) {
         showToast(`Route ${truck} is full (${MAX_STOPS} stops) — too far for overflow`, 'error');
         dragData = null;
         return;
       } else {
-        showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
+        showToast(`⚠ Over capacity (${toPC + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
       }
     }
 
@@ -4055,18 +4082,19 @@ function handleTruckDrop(e, dayKey, truck, insertAtIdx) {
     return;
   }
 
-  // Reject: full (4 stops) and not within overflow radius (managers bypass distance gate)
+  // Reject: full (4 physical stops) and not within overflow radius (managers bypass distance gate)
   const stops = state.schedule[dayKey]?.[truck] || [];
-  if (stops.length >= MAX_STOPS) {
+  const { physicalCount: pc } = getPhysicalStops(stops);
+  if (pc >= MAX_STOPS) {
     if (state.viewMode === 'manager') {
-      showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — manager override`, 'warning');
+      showToast(`⚠ Over capacity (${pc + 1}/${MAX_STOPS}) — manager override`, 'warning');
     } else {
       const minDist = stops.reduce((min, s) => Math.min(min, distanceMiles(card.coords, s.coords)), Infinity);
       if (minDist > OVERFLOW_RADIUS_MILES) {
         showToast(`Route ${truck} is full (${MAX_STOPS} stops) — card too far for overflow`, 'error');
         return;
       }
-      showToast(`⚠ Over capacity (${stops.length + 1}/${MAX_STOPS}) — card is nearby, allowed`, 'warning');
+      showToast(`⚠ Over capacity (${pc + 1}/${MAX_STOPS}) — card is nearby, allowed`, 'warning');
     }
   }
 
@@ -4363,15 +4391,16 @@ function applyAssignment(card, dayKey, truck, pos, firstStopStatus = null) {
   }
   var existingStops = state.schedule[dayKey]?.[truck] || [];
   var ofCheck = checkOverflowAllowed(existingStops, card.coords);
-  if (existingStops.length >= MAX_STOPS) {
+  var exPC = getPhysicalStops(existingStops).physicalCount;
+  if (exPC >= MAX_STOPS) {
     if (state.viewMode === 'manager') {
       // Manager full bypass — no distance gate
-      showToast('⚠ Over capacity (' + (existingStops.length + 1) + '/' + MAX_STOPS + ') — manager override', 'warning');
+      showToast('⚠ Over capacity (' + (exPC + 1) + '/' + MAX_STOPS + ') — manager override', 'warning');
     } else if (!ofCheck.allowed) {
       showToast('Route ' + truck + ' is full (' + MAX_STOPS + ' stops) — card too far for overflow', 'error');
       return;
     } else {
-      showToast('⚠ Over capacity (' + (existingStops.length + 1) + '/' + MAX_STOPS + ') — nearby, allowed', 'warning');
+      showToast('⚠ Over capacity (' + (exPC + 1) + '/' + MAX_STOPS + ') — nearby, allowed', 'warning');
     }
   }
 
@@ -4671,15 +4700,20 @@ function dropStop(e, dayKey, truck, toIdx) {
   }
 
   // Check capacity with overflow proximity (Bug 1 fix — was hard-coded 4, no proximity)
+  // S46: manager bypass added (was missing — caused manager block at 4+ stops), physicalCount for P26
   const movedStop = fromStops[fromIdx];
   const ofCheck = checkOverflowAllowed(toStops, movedStop?.coords);
-  if (toStops.length >= MAX_STOPS) {
-    if (!ofCheck.allowed) {
+  const { physicalCount: toPC } = getPhysicalStops(toStops);
+  if (toPC >= MAX_STOPS) {
+    if (state.viewMode === 'manager') {
+      showToast(`⚠ Over capacity (${toPC + 1}/${MAX_STOPS}) — manager override`, 'warning');
+    } else if (!ofCheck.allowed) {
       showToast(`Route ${truck} is full (${MAX_STOPS} stops) — too far for overflow`, 'error');
       dragData = null;
       return;
+    } else {
+      showToast(`⚠ Over capacity (${toPC + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
     }
-    showToast(`⚠ Over capacity (${toStops.length + 1}/${MAX_STOPS}) — nearby, allowed`, 'warning');
   }
 
   const [moved] = fromStops.splice(fromIdx, 1);
