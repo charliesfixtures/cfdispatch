@@ -1575,8 +1575,12 @@ body {
   from { stroke-dashoffset: 0; }
   to { stroke-dashoffset: -16; }
 }
+@keyframes flowDashC {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -18; }
+}
 .route-line {
-  /* Static by default — animation applied via .route-animate-a / .route-animate-b */
+  /* Static by default — animation applied via .route-animate-a / .route-animate-b / .route-animate-c */
 }
 .route-line.route-animate-a {
   animation: flowDashA 1s linear infinite;
@@ -1584,6 +1588,10 @@ body {
 }
 .route-line.route-animate-b {
   animation: flowDashB 0.35s linear infinite;
+  opacity: 0.75;
+}
+.route-line.route-animate-c {
+  animation: flowDashC 0.6s linear infinite;
   opacity: 0.75;
 }
 .route-line.route-dim {
@@ -2885,8 +2893,8 @@ function showRoutePreview(cardId, dayKey, truck, insertPos) {
   const stopCoords = existingStops.map(s => s.coords);
   stopCoords.splice(insertPos, 0, card.coords);
 
-  // Full route: Warehouse → stops → HQ
-  const routePoints = [FRUITLAND, ...stopCoords, HQ].map(p => [p.lat, p.lng]);
+  // Full route: Warehouse → stops (no return leg)
+  const routePoints = [FRUITLAND, ...stopCoords].map(p => [p.lat, p.lng]);
 
   // Draw preview polyline — golden dashed, semi-transparent
   previewLayer = L.polyline(routePoints, {
@@ -2924,6 +2932,9 @@ function clearRoutePreview() {
 }
 
 function renderMap() {
+  // P28 FIX — force Leaflet to recalculate viewport before drawing
+  if (map) map.invalidateSize({ animate: false });
+
   // Clear preview if active
   clearRoutePreview();
   // Clear existing (preserve search pin — managed separately)
@@ -2948,12 +2959,12 @@ function renderMap() {
 
       const driver = getDriverForTruck(key, truck);
       const driverOrFallback = driver || state.drivers[0]; // fallback for route planning, not for pins
-      const routePoints = [FRUITLAND, ...stops.map(s => s.coords), HQ];
+      const routePoints = [FRUITLAND, ...stops.map(s => s.coords)];
 
-      // Route line — Truck B gets lighter opacity to differentiate
+      // Route line — distinct dash per truck: A = thin dashes, B = dots, C = dash-dot
       const truckOpacity = 0.75;
-      const truckWeight = truck === 'A' ? 1 : 1.5;
-      const truckDash = truck === 'A' ? '10 6' : '2 6';
+      const truckWeight = truck === 'A' ? 1 : truck === 'B' ? 1.5 : 2;
+      const truckDash = truck === 'A' ? '10 6' : truck === 'B' ? '2 6' : '8 4 2 4';
       const line = L.polyline(
         routePoints.map(p => [p.lat, p.lng]),
         {
@@ -2971,13 +2982,20 @@ function renderMap() {
       if (!state.mapRouteLines[key]) state.mapRouteLines[key] = [];
       state.mapRouteLines[key].push(line);
 
-      // Stop pins — circle for Truck A, rounded square for Truck B
+      // Stop pins — circle for Truck A, diamond for Truck B, rounded square for Truck C
       stops.forEach((stop, i) => {
         if (!stop.coords) return;
-        const radius = truck === 'A' ? '50%' : '6px';
+        let pinHtml;
+        if (truck === 'B') {
+          // Diamond: rotated square, number counter-rotated to read straight
+          pinHtml = `<div style="background:${dayColor};width:20px;height:20px;border-radius:3px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)"><span style="transform:rotate(-45deg)">${i+1}</span></div>`;
+        } else {
+          const radius = truck === 'A' ? '50%' : '6px';
+          pinHtml = `<div style="background:${dayColor};width:24px;height:24px;border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)">${i+1}</div>`;
+        }
         const icon = L.divIcon({
           className: '',
-          html: `<div style="background:${dayColor};width:24px;height:24px;border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)">${i+1}</div>`,
+          html: pinHtml,
           iconSize: [24, 24],
           iconAnchor: [12, 12]
         });
@@ -3097,7 +3115,16 @@ function renderMap() {
       });
       state.unscheduledMarkers.push(marker);
     });
-  updateRouteAnimation();
+
+  // P28 FIX — Leaflet SVG paths need the browser to fully paint before they render.
+  // invalidateSize before draw (above) + delayed redraw + animation after paint settles.
+  setTimeout(() => {
+    if (map) map.invalidateSize({ animate: false });
+    Object.values(state.mapRouteLines).flat().forEach(l => {
+      if (l.redraw) l.redraw();
+    });
+    updateRouteAnimation();
+  }, 80);
 }
 
 // ── ROUTE ANIMATION CONTROL ──
@@ -3131,9 +3158,9 @@ function updateRouteAnimation() {
       if (!el) return;
 
       // Reset classes
-      el.classList.remove('route-animate-a', 'route-animate-b', 'route-dim');
+      el.classList.remove('route-animate-a', 'route-animate-b', 'route-animate-c', 'route-dim');
 
-      const animClass = line._routeTruck === 'A' ? 'route-animate-a' : 'route-animate-b';
+      const animClass = line._routeTruck === 'A' ? 'route-animate-a' : line._routeTruck === 'B' ? 'route-animate-b' : 'route-animate-c';
 
       if (selectedCard && selectedRouteKey) {
         // Card is selected AND it's on a route
@@ -3845,6 +3872,8 @@ function unfocusMapDots() {
 document.addEventListener('click', (e) => {
   if (state.popoverTarget && !e.target.closest('.card-popover') && !e.target.closest('.queue-card') && !e.target.closest('.stop-item')) {
     hideCardPopover();
+    state.selectedCard = null;
+    updateRouteAnimation();
     renderQueue();
   }
 });
