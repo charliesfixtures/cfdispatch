@@ -4579,7 +4579,7 @@ function rejectCard(cardId) {
   showConfirm(
     '↩',
     'Return to OPEN SO?',
-    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling and returns it to the salesperson's queue.`,
+    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling, clears the RS date, and returns it to the salesperson's queue.`,
     async () => {
       // 1. Remove from local state immediately
       state.queueCards = state.queueCards.filter(c => c.id !== cardId);
@@ -4626,6 +4626,11 @@ function rejectCard(cardId) {
         if (!moved) {
           showToast('⚠ Removed from queue but could not find PK list — check Trello', 'warning');
         }
+
+        // S48: Clear RS field so Butler "RS filled → move to RFS" won't bounce card back
+        try {
+          await trello(`/cards/${cardId}/customField/${getFieldId('RS')}/item`, 'PUT', { value: { text: '' } });
+        } catch(e) { console.warn('Reject: could not clear RS field', e); }
       } catch(e) {
         console.warn('Reject: could not move card', e);
         showToast('⚠ Removed from queue but Trello move failed', 'warning');
@@ -4974,7 +4979,18 @@ function assignDriverToTruck(dayKey, truck, driverId) {
     const driver = state.drivers.find(d => d.id === driverId);
     const status = driver ? getDriverStatus(driver) : null;
 
-    // If driver is on another truck same day, swap them
+    // S48/P30: If driver is already on a LOCKED truck, block — don't swap
+    for (const t of ['A','B','C']) {
+      if (t === truck) continue;
+      if (state.truckDrivers[`${dayKey}-${t}`] === driverId && state.lockedTrucks[`${dayKey}-${t}`]) {
+        const name = driver?.name?.split(' ')[0] || 'Driver';
+        showToast(`⚠ ${name} is assigned to locked Route ${t} — unlock it first to reassign`, 'warning');
+        closeDriverPicker();
+        return;
+      }
+    }
+
+    // If driver is on another truck same day (unlocked), swap them
     for (const t of ['A','B','C']) {
       if (t === truck) continue;
       if (state.truckDrivers[`${dayKey}-${t}`] === driverId) {
@@ -5026,6 +5042,25 @@ async function loadData() {
 
     // S37: Load DISPATCH CONFIG card (locks + driver assignments)
     await loadDispatchConfig();
+
+    // S48: Auto-populate default drivers for days with no assignment
+    // Yeri → Route A, Darvi → Route B. Only writes if no config entry exists.
+    if (state.drivers.length) {
+      const defaultDrivers = { A: 'Yeri', B: 'Darvi' };
+      const allDays = [...getWeekDates(0), ...getWeekDates(1)];
+      for (const wd of allDays) {
+        for (const [truck, firstName] of Object.entries(defaultDrivers)) {
+          const truckKey = `${wd.key}-${truck}`;
+          if (!state.truckDrivers[truckKey]) {
+            const driver = state.drivers.find(d => d.name.split(' ')[0].toLowerCase() === firstName.toLowerCase());
+            if (driver) {
+              state.truckDrivers[truckKey] = driver.id;
+              writeDispatchConfig('DRIVER', wd.key, truck, firstName).catch(e => console.warn('Auto-populate driver write failed:', e));
+            }
+          }
+        }
+      }
+    }
 
     // Load all board lists to find "RFS" (RFS lives on main board to preserve card members)
     const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
@@ -5981,6 +6016,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- BRAND FLOAT -->
 <div class="brand-float">
+  <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-label" style="font-size:9px;color:rgba(0,0,0,0.22);font-family:'Inter Tight',sans-serif;white-space:nowrap;">Connecting...</span>
+  </div>
   <div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;">
     <img src="assets/dispatch-logo-new.png" class="brand-logo" alt="Dispatch" />
     <span class="brand-byline" style="align-self:flex-end;">by: will.powah</span>
@@ -5989,10 +6028,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- ACTION BUTTONS -->
 <div class="action-float">
-  <div class="sync-indicator" style="display:flex;align-items:center;gap:4px;margin-right:4px;">
-    <div class="sync-dot" id="sync-dot"></div>
-    <span id="sync-label" style="font-size:9px;color:rgba(0,0,0,0.22);font-family:'Inter Tight',sans-serif;white-space:nowrap;">Connecting...</span>
-  </div>
   <button class="btn-icon" onclick="refreshData()" title="Refresh">↻</button>
   <button class="btn-icon" onclick="openSettings()" title="Settings">⚙</button>
 </div>
