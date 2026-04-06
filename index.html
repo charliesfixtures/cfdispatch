@@ -4204,9 +4204,19 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
         if (member.username) mentionTag = `@${member.username}`;
         const firstName = member.fullName?.split(' ')[0] || '';
 
-        // 4a. Primary: staffMap.trelloShipper lookup (exact list name, zero extra API calls)
+        // 4a. S48: PO-WC label → route to "PO Will Call" list instead of SHIPPER
         let moved = false;
-        if (state.staffMap?.[ownerMemberId]?.trelloShipper) {
+        if (cardLabels.some(l => l.toUpperCase() === 'PO-WC')) {
+          const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
+          const poList = lists.find(l => l.name === 'PO Will Call');
+          if (poList) {
+            await trello(`/cards/${stop.cardId}`, 'PUT', { idList: poList.id });
+            moved = true;
+          }
+        }
+
+        // 4b. Primary: staffMap.trelloShipper lookup (exact list name, zero extra API calls)
+        if (!moved && state.staffMap?.[ownerMemberId]?.trelloShipper) {
           const shipperName = state.staffMap[ownerMemberId].trelloShipper.split(',')[0].trim();
           const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
           const shipperList = lists.find(l => l.name === shipperName);
@@ -4216,7 +4226,7 @@ async function commitSingleCard(dayKey, truck, stopIndex) {
           }
         }
 
-        // 4b. Fallback: first-name match (mirrors reject pattern)
+        // 4c. Fallback: first-name match (mirrors reject pattern)
         if (!moved && firstName) {
           const lists = await trello(`/boards/${BOARD_ID}/lists?fields=name`);
           const shipperList = lists.find(l => l.name.toLowerCase().includes('shipper') && l.name.toLowerCase().includes(firstName.toLowerCase()));
@@ -4579,7 +4589,7 @@ function rejectCard(cardId) {
   showConfirm(
     '↩',
     'Return to OPEN SO?',
-    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling, clears the RS date, and returns it to the salesperson's queue.`,
+    `This removes "${card.name.split(' ').slice(0,4).join(' ')}…" from scheduling and returns it to the salesperson's queue. RS date will be cleared automatically.`,
     async () => {
       // 1. Remove from local state immediately
       state.queueCards = state.queueCards.filter(c => c.id !== cardId);
@@ -5038,25 +5048,6 @@ async function loadData() {
 
     // S37: Load DISPATCH CONFIG card (locks + driver assignments)
     await loadDispatchConfig();
-
-    // S48: Auto-populate default drivers for days with no assignment
-    // Yeri → Route A, Darvi → Route B. Only writes if no config entry exists.
-    if (state.drivers.length) {
-      const defaultDrivers = { A: 'Yeri', B: 'Darvi' };
-      const allDays = [...getWeekDates(0), ...getWeekDates(1)];
-      for (const wd of allDays) {
-        for (const [truck, firstName] of Object.entries(defaultDrivers)) {
-          const truckKey = `${wd.key}-${truck}`;
-          if (!state.truckDrivers[truckKey]) {
-            const driver = state.drivers.find(d => d.name.split(' ')[0].toLowerCase() === firstName.toLowerCase());
-            if (driver) {
-              state.truckDrivers[truckKey] = driver.id;
-              writeDispatchConfig('DRIVER', wd.key, truck, firstName).catch(e => console.warn('Auto-populate driver write failed:', e));
-            }
-          }
-        }
-      }
-    }
 
     // Load all board lists to find "RFS" (RFS lives on main board to preserve card members)
     const lists = await trello(`/boards/${BOARD_ID}/lists?fields=id,name`);
