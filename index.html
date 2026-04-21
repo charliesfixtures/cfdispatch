@@ -5032,7 +5032,9 @@ function assignDriverToTruck(dayKey, truck, driverId) {
 let _loadDataInFlight = false;
 
 
-async function loadData() {
+async function loadData(skipActions = false) {
+  // S49: skipActions=true skips queuedAt action fetches (one per queue card) to cut Cloudflare KV reads.
+  // Auto-sync passes true; user-facing loads (init, manual refresh, post-lock/unlock) pass false for freshness.
   if (_loadDataInFlight) return; // concurrency guard — skip if already running
   _loadDataInFlight = true;
   setSyncStatus('syncing', 'Syncing...');
@@ -5212,15 +5214,21 @@ async function loadData() {
 
     // queuedAt fetch — non-blocking fire-and-forget
     // Runs AFTER render so it never delays the UI or creates a race window
-    Promise.all(state.queueCards.map(async (card) => {
-      try {
-        const actions = await trello(`/cards/${card.id}/actions?filter=updateCard,createCard&limit=50`);
-        const rfsAction = actions.find(a => a.data?.listAfter?.name === 'RFS');
-        // Fallback: if card was created directly in RFS, use createCard action date
-        const createAction = actions.find(a => a.type === 'createCard');
-        card.queuedAt = rfsAction ? rfsAction.date : (createAction ? createAction.date : null);
-      } catch(e) { card.queuedAt = null; }
-    })).then(() => { renderQueue(); }).catch(() => {});
+    // S49: Skipped on auto-sync (skipActions=true) to cut Cloudflare KV reads.
+    // Since "when a card entered RFS" rarely changes between syncs, existing
+    // queuedAt values persist on the card objects across loads until a full
+    // load (manual refresh / init / lock-unlock) refreshes them.
+    if (!skipActions) {
+      Promise.all(state.queueCards.map(async (card) => {
+        try {
+          const actions = await trello(`/cards/${card.id}/actions?filter=updateCard,createCard&limit=50`);
+          const rfsAction = actions.find(a => a.data?.listAfter?.name === 'RFS');
+          // Fallback: if card was created directly in RFS, use createCard action date
+          const createAction = actions.find(a => a.type === 'createCard');
+          card.queuedAt = rfsAction ? rfsAction.date : (createAction ? createAction.date : null);
+        } catch(e) { card.queuedAt = null; }
+      })).then(() => { renderQueue(); }).catch(() => {});
+    }
 
   } catch (e) {
     setSyncStatus('error', 'Sync failed');
@@ -5920,12 +5928,13 @@ function clearSearchPin() {
 
 // ════════════════════════════════════════════════════════
 // AUTO SYNC — S38: fingerprint-aware, frost only on data change
+// S49: skipActions=true (no queuedAt fetch) + 120s interval to cut KV reads
 // ════════════════════════════════════════════════════════
 setInterval(async () => {
   const beforePrint = getStateFingerprint();
 
-  // Silent fetch — no frost yet
-  await loadData();
+  // Silent fetch — no frost yet. skipActions=true skips per-card queuedAt fetches.
+  await loadData(true);
 
   const afterPrint = getStateFingerprint();
 
@@ -5937,7 +5946,7 @@ setInterval(async () => {
     showToast('Schedule updated', 'info');
   }
   // No change → nothing visible happens. Sync timestamp already updated by loadData.
-}, 60000);
+}, 120000);
 
 // ════════════════════════════════════════════════════════
 // INIT
